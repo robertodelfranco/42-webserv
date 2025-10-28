@@ -1,11 +1,17 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
-#include <unistd.h>       // close()
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#define YELLOW "\033[1;33m"
+#define GREEN "\033[1;32m"
+#define CYAN "\033[1;36m"
+#define RED "\033[1;31m"
+#define RESET "\033[0m"
 
 int main()
 {
@@ -57,8 +63,19 @@ int main()
         std::memset(buffer, 0, sizeof(buffer));
         ssize_t n = read(conn_fd, buffer, sizeof(buffer) - 1);
         if (n > 0) {
+            if (strncmp("DELETE", buffer, 6) == 0)
+                std::cout << RED << "METHOD DELETE CALLED!" << RESET << std::endl;
+            else if (strncmp("POST", buffer, 4) == 0)
+                std::cout << CYAN << "METHOD POST CALLED!" << RESET << std::endl;
+            else if (strncmp("GET", buffer, 3) == 0)
+                std::cout << GREEN << "METHOD GET CALLED!" << RESET << std::endl;
+            else {
+                std::cout << YELLOW << "METHOD NOT FOUND" << RESET << std::endl;
+                close(conn_fd);
+                continue ;
+            }
             std::cout << "Recebido: " << buffer << "\n";
-            const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
+            const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\nHello, world!\r\n\nhi\n\n";
             write(conn_fd, response, std::strlen(response));
         } else {
 			std::cerr << "Erro read\n";

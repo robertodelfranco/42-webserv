@@ -8,6 +8,13 @@ enum method
 	DELETE,
 } 	method;
 
+enum socket_state
+{
+	LISTENING,
+	CONNECTED,
+	CLOSED,
+}	socket_state;
+
 enum status_code 
 {
 	OK = 200,
