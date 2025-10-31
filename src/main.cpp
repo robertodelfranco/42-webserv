@@ -15,6 +15,10 @@
 
 int main()
 {
+
+
+    
+
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_fd < 0) {
         std::cerr << "Erro ao criar socket\n";
@@ -75,9 +79,10 @@ int main()
                 continue ;
             }
             std::cout << "Recebido: " << buffer << "\n";
-            const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\nHello, world!\r\n\nhi\n\n";
+            const char *response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!\r\n\nhi\n\n";
             write(conn_fd, response, std::strlen(response));
-        } else {
+        } 
+        else {
 			std::cerr << "Erro read\n";
 		}
         
