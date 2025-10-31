@@ -2,8 +2,13 @@ NAME	=	webserv
 CC		=	c++
 FLAGS	=	-Wall -Werror -Wextra -std=c++98
 
-SRC_DIR	=	srcs/
-SRCS	=	main.cpp
+SRC_DIR	=	src/
+DIRS	=	./src/Utils ./src/Config ./src/Parser ./src/Network
+SRCS	=	main.cpp \
+# 			$(addprefix $(DIRS[0])/, Utils.cpp) \
+# 			$(addprefix $(DIRS[1])/, Config.cpp ConfigError.cpp Location.cpp Server.cpp) \
+# 			$(addprefix $(DIRS[2])/, Parser.cpp ParserError.cpp) \
+# 			$(addprefix $(DIRS[3])/, Network.cpp ClientConnection.cpp Response.cpp Request.cpp)
 
 MAGENTA	=	\033[1;95m
 YELLOW	=	\033[1;93m
