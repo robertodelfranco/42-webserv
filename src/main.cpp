@@ -8,7 +8,6 @@ int main(int ac, char **av)
     }
 
     Config parserConfig;
-
     parserConfig.init(av[1]);
 
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);

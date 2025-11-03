@@ -13,7 +13,7 @@ Config& Config::operator=(const Config& other) {
 
 Config::~Config() {};
 
-void	init(const char *file) {
+void	Config::init(const char *file) {
 	if (!file || !*file) {
 		std::cerr << "Nenhum arquivo de configuração foi encontrado" << std::endl;
 		return;
