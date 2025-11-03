@@ -4,6 +4,20 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <cstdlib>
+#include <cstring>
+#include <unistd.h>
+#include <fstream>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define YELLOW "\033[1;33m"
+#define GREEN "\033[1;32m"
+#define CYAN "\033[1;36m"
+#define RED "\033[1;31m"
+#define RESET "\033[0m"
 
 enum Method
 {

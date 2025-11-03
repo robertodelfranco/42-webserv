@@ -1,23 +1,15 @@
-#include <iostream>
-#include <cstdlib>
-#include <cstring>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include "Config/Config.hpp"
 
-#define YELLOW "\033[1;33m"
-#define GREEN "\033[1;32m"
-#define CYAN "\033[1;36m"
-#define RED "\033[1;31m"
-#define RESET "\033[0m"
-
-int main()
+int main(int ac, char **av)
 {
+    if (ac > 2) {
+        std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
+        return 1;
+    }
 
+    Config parserConfig;
 
-    
+    parserConfig.init(av[1]);
 
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_fd < 0) {
