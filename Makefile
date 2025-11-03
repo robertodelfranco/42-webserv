@@ -14,7 +14,7 @@ RED		=	\033[1;91m
 NC		=	\033[0m
 
 OBJ_DIR	=	objs
-OBJS	=	$(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SRCS))
+OBJS	=	$(patsubst %.cpp, $(OBJ_DIR)/%.o, $(SRCS))
 VPATH	=	$(SRC_DIR):Config:Utils:Parser:Network
 
 all:
@@ -34,12 +34,7 @@ $(OBJ_DIR)/%.o : %.cpp
 
 
 clean:
-	@rm -rf ${OBJS}
-	@if [ -d "$(OBJ_DIR)" ]; then \
-		if [ ! "$(ls -A $(OBJ_DIR))" ]; then \
-			rmdir $(OBJ_DIR); \
-		fi \
-	fi
+	@rm -rf $(OBJ_DIR)
 	@echo "${RED}Object files and empty object directory cleaned!${NC}"
 
 fclean:	clean
