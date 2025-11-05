@@ -6,7 +6,6 @@
 
 class Config {
 	private:
-		std::ifstream		configFile;
 		std::vector<Server>	servers;
 
 	public:

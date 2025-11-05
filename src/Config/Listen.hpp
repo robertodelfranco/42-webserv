@@ -6,6 +6,8 @@
 struct Listen {
 	std::string		host; // 127.0.0.1 ou 0.0.0.0
 	unsigned short	port; // porta
+
+	Listen();
 };
 
 #endif
