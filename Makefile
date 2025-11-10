@@ -5,6 +5,9 @@ FLAGS	=	-Wall -Werror -Wextra -std=c++98
 SRC_DIR	=	src
 SRCS	=	main.cpp \
 			Config/Config.cpp \
+			Config/Server.cpp \
+			Utils/structs.cpp
+
 
 MAGENTA	=	\033[1;95m
 YELLOW	=	\033[1;93m
