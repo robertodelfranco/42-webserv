@@ -2,8 +2,6 @@
 # define SERVER_HPP
 
 #include "../Utils/structs.hpp"
-#include "Listen.hpp"
-#include "Location.hpp"
 
 class Server {
 	private:

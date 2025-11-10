@@ -1,5 +1,5 @@
 #ifndef STRUCTS_HPP
-#define STRUCTS_HPP
+# define STRUCTS_HPP
 
 #include <iostream>
 #include <vector>
@@ -55,6 +55,31 @@ enum StatusCode
 	METHOD_NOT_ALLOWED = 405,
 	PAYLOAD_TOO_LARGE = 413,
 	INTERNAL_SERVER_ERROR = 500,
+};
+
+struct Token {
+	TokenType	type;
+	std::string	value;
+	int			line;
+	int			col;
+
+	Token();
+};
+
+struct Listen {
+	std::string		host; // 127.0.0.1 ou 0.0.0.0
+	unsigned short	port; // porta
+
+	Listen();
+};
+
+struct Location {
+	bool						autoindex; // caso tenha ou não autoindex ligado
+	std::string					path; // caminho padrão do location
+	std::string					root_override; // caso algo sobreponha o destino root
+	std::vector<std::string>	allow_methods; // GET, POST e DELETE
+
+	Location();
 };
 
 #endif

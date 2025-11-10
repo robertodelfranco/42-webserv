@@ -4,13 +4,6 @@
 #include "../Utils/structs.hpp"
 #include "Server.hpp"
 
-struct Token {
-	TokenType	type;
-	std::string	value;
-	int			line;
-	int			col;
-};
-
 class Config {
 	private:
 		std::ifstream		configFile;
