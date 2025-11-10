@@ -4,8 +4,17 @@
 #include "../Utils/structs.hpp"
 #include "Server.hpp"
 
+struct Token {
+	TokenType	type;
+	std::string	value;
+	int			line;
+	int			col;
+};
+
 class Config {
 	private:
+		std::ifstream		configFile;
+		std::vector<Token>	tokens;
 		std::vector<Server>	servers;
 
 	public:
@@ -15,6 +24,7 @@ class Config {
 		~Config();
 
 		void	init(const char *file);
+
 };
 
 #endif

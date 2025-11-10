@@ -26,6 +26,18 @@ enum Method
 	DELETE,
 };
 
+enum TokenType {
+	UNKNOWN,
+	IDENTIFIER,
+	NUMBER,
+	STRING,
+	PATH,
+	LBRACE,
+	RBRACE,
+	SEMICOLON,
+	END_OF_STREAM
+};
+
 enum SocketState
 {
 	LISTENING,
