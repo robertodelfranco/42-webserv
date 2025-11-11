@@ -1,7 +1,7 @@
 #ifndef CONFIG_HPP
 # define CONFIG_HPP
 
-#include "../Utils/structs.hpp"
+#include "../Utils/Utils.hpp"
 #include "Server.hpp"
 
 class Config {
@@ -10,6 +10,8 @@ class Config {
 		std::vector<Token>	tokens;
 		std::vector<Server>	servers;
 
+		void	consumeLine(const std::string& line);
+
 	public:
 		Config();
 		Config(const Config& other);
@@ -17,7 +19,6 @@ class Config {
 		~Config();
 
 		void	init(const char *file);
-
 };
 
 #endif

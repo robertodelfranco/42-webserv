@@ -32,10 +32,16 @@ void	Config::init(const char *file) {
 		if (pos != std::string::npos) {
 			line = line.substr(0, pos);
 		}
-		if (line.find_first_not_of(" \t") != std::string::npos) {
-			std::cout << line << std::endl;
+		Utils::ref_trim(line);
+		if (line.length() > 0) {
+			std::cout << YELLOW << line << " |" << RESET << std::endl;
+			consumeLine(line);
 		}
 	}
 
 	configFile.close();
 };
+
+void	Config::consumeLine(const std::string& line) {
+	(void)line;
+}
