@@ -12,5 +12,5 @@ Location::Location(const std::string& path, const std::string& root, const std::
 
 Token::Token() : type(UNKNOWN), value(), line(0), col(0) {}
 
-Token::Token(TokenType type, const std::string& value, int line, int col)
+Token::Token(TokenType type, const std::string& value, size_t line, size_t col)
 : type(type), value(value), line(line), col(col) {}

@@ -10,7 +10,7 @@ class Config {
 		std::vector<Token>	tokens;
 		std::vector<Server>	servers;
 
-		void	consumeLine(const std::string& line);
+		void	consumeLine(std::string& line, size_t count_line);
 
 	public:
 		Config();

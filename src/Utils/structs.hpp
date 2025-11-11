@@ -60,11 +60,11 @@ enum StatusCode
 struct Token {
 	TokenType	type;
 	std::string	value;
-	int			line;
-	int			col;
+	size_t		line;
+	size_t		col;
 
 	Token();
-	Token(TokenType type, const std::string& value, int line, int col);
+	Token(TokenType type, const std::string& value, size_t line, size_t col);
 };
 
 struct Listen {
