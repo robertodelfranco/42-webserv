@@ -1,17 +1,17 @@
 #include "Config.hpp"
 
-Config::Config() : servers() {};
+Config::Config() : servers() {}
 
-Config::Config(const Config& other) : servers(other.servers) {};
+Config::Config(const Config& other) : servers(other.servers) {}
 
 Config& Config::operator=(const Config& other) {
 	if (this != &other) {
 		servers = other.servers;
 	}
 	return *this;
-};
+}
 
-Config::~Config() {};
+Config::~Config() {}
 
 void	Config::init(const char *file) {
 	if (!file || !*file) {
@@ -42,7 +42,37 @@ void	Config::init(const char *file) {
 	}
 	tokens.push_back(Token(END_OF_STREAM, "EOF", count_lines, 0));
 	configFile.close();
-};
+}
+
+size_t	Config::consumeIdentifier(const std::string& line, size_t col) {
+	(void)line;
+	(void)col;
+}
+
+size_t	Config::consumeNumber(const std::string& line, size_t col) {
+	(void)line;
+	(void)col;
+}
+
+size_t	Config::consumeString(const std::string& line, size_t col) {
+	(void)line;
+	(void)col;
+}
+
+size_t	Config::consumePath(const std::string& line, size_t col) {
+	(void)line;
+	(void)col;
+}
+
+size_t	Config::consumeSymbol(const std::string& line, size_t col) {
+	(void)line;
+	(void)col;
+}
+
+size_t	Config::edgeCase(const std::string& line, size_t col) {
+	(void)line;
+	(void)col;
+}
 
 void	Config::consumeLine(std::string& line, size_t count_line) {
 
@@ -57,18 +87,14 @@ void	Config::consumeLine(std::string& line, size_t count_line) {
 			++col;
 			continue ;
 		}
-		if (std::isalpha(c) || c == '_') {
+		if (std::isalpha(c) || c == '_')
 			col = consumeIdentifier(line, col);
-		}
-		else if (std::isdigit(c)) {
+		else if (std::isdigit(c))
 			col = consumeNumber(line, col);
-		}
-		else if (c == '\"' || c == '\'') {
+		else if (c == '\"' || c == '\'')
 			col = consumeString(line, col);
-		}
-		else if (c == '/' || c == '.') {
+		else if (c == '/' || c == '.')
 			col = consumePath(line, col);
-		}
 		else if (c == '{' || c == '}' || c == ';')
 			col = consumeSymbol(line, col);
 		else
