@@ -64,6 +64,7 @@ struct Token {
 	int			col;
 
 	Token();
+	Token(TokenType type, const std::string& value, int line, int col);
 };
 
 struct Listen {
@@ -71,15 +72,17 @@ struct Listen {
 	unsigned short	port; // porta
 
 	Listen();
+	Listen(const std::string& host, int port);
 };
 
 struct Location {
-	bool						autoindex; // caso tenha ou não autoindex ligado
 	std::string					path; // caminho padrão do location
-	std::string					root_override; // caso algo sobreponha o destino root
+	std::string					root; // caso algo sobreponha o destino root
 	std::vector<std::string>	allow_methods; // GET, POST e DELETE
+	bool						autoindex; // caso tenha ou não autoindex ligado
 
 	Location();
+	Location(const std::string& path, const std::string& root, const std::vector<std::string>& allow_methods, bool autoindex);
 };
 
 #endif

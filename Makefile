@@ -6,7 +6,8 @@ SRC_DIR	=	src
 SRCS	=	main.cpp \
 			Config/Config.cpp \
 			Config/Server.cpp \
-			Utils/structs.cpp
+			Utils/structs.cpp \
+			Utils/Utils.cpp
 
 
 MAGENTA	=	\033[1;95m
