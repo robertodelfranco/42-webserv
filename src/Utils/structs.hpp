@@ -2,16 +2,18 @@
 # define STRUCTS_HPP
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <vector>
 #include <map>
 #include <cstdlib>
 #include <cstring>
 #include <unistd.h>
-#include <fstream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdexcept>
 
 #define YELLOW "\033[1;33m"
 #define GREEN "\033[1;32m"

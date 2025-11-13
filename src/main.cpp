@@ -7,8 +7,13 @@ int main(int ac, char **av)
         return 1;
     }
 
-    Config parserConfig;
-    parserConfig.init(av[1]);
+    try {
+        Config parserConfig;
+        parserConfig.init(av[1]);
+    }
+    catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
+    }
 
     int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_fd < 0) {
