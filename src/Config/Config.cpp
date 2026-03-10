@@ -276,50 +276,110 @@ void	Config::getListen(Server& server, std::vector<Token>::iterator& it) {
 	if (it->type != STRING)
 		throw ParseError("Invalid listen argument", it->line, it->col, it->value);
 
-	std::string	value;
+	std::string	value = Utils::trim(it->value);
+	std::string	host;
+	std::string	port;
+	size_t		colon = value.rfind(':');
 
-	value = Utils::trim(it->value);
+	if (colon != std::string::npos) {
+		host = value.substr(0, colon);
+		port = value.substr(colon + 1);
+	} 
+	else
+		port = value;
 
-	size_t	last = value.find_last_not_of(":");
-
-	server.setListen(value.substr(0, last), value.substr(last, value.size() - last));
+	server.setListen(host, port);
 
 	++it;
 	if (it->type != SYMBOL)
 		throw ParseError("Listen only accept one argument", it->line, it->col, it->value);
 }
+
 void	Config::getServerName(Server& server, std::vector<Token>::iterator& it) {
 	(void)server;
 	(void)it;
 }
+
 void	Config::getBodySize(Server& server, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)it;
+	++it;
+	if (it->type != STRING)
+		throw ParseError("Invalid body size argument", it->line, it->col, it->value);
+	
+	std::string	value = Utils::trim(it->value);
+	size_t		multiplier = 1;
+
+	if (value.empty())
+		throw ParseError("Empty body size value", it->line, it->col, it->value);
+
+	char last_char = value[value.size() - 1];
+	if (last_char == 'K' || last_char == 'k') {
+		multiplier = 1024;
+		value = value.substr(0, value.size() - 1);
+	}
+	else if (last_char == 'M' || last_char == 'm') {
+		multiplier = 1024 * 1024;
+		value = value.substr(0, value.size() - 1);
+	}
+	else if (!std::isdigit(last_char)) {
+		throw ParseError("Invalid body size suffix", it->line, it->col, it->value);
+	}
+
+	if (value.empty())
+		throw ParseError("Missing numeric value in body size", it->line, it->col, it->value);
+
+	for (size_t i = 0; i < value.size(); ++i) {
+        if (!std::isdigit(value[i]))
+            throw ParseError("Invalid body size value", it->line, it->col, it->value);
+    }
+
+	long long size = std::atoll(value.c_str());
+    if (size < 0)
+        throw ParseError("Body size cannot be negative", it->line, it->col, it->value);
+
+    long long max_size = std::numeric_limits<long long>::max() / static_cast<long long>(multiplier);
+    if (size > max_size)
+        throw ParseError("Body size is too large", it->line, it->col, it->value);
+
+    server.setBodySize(size * multiplier);
 }
+
 void	Config::getRoot(Server& server, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)it;
+	++it;
+	if (it->type != PATH)
+		throw ParseError("Invalid root argument", it->line, it->col, it->value);
+
+	server.setRoot(it->value);
+
+	++it;
+	if (it->type != SYMBOL)
+		throw ParseError("Root only accept one argument", it->line, it->col, it->value);
 }
+
 void	Config::getIndexPage(Server& server, std::vector<Token>::iterator& it) {
 	(void)server;
 	(void)it;
 }
+
 void	Config::getErrorPages(Server& server, std::vector<Token>::iterator& it) {
 	(void)server;
 	(void)it;
 }
+
 void	Config::getMethods(Server& server, std::vector<Token>::iterator& it) {
 	(void)server;
 	(void)it;
 }
+
 void	Config::getRedirect(Server& server, std::vector<Token>::iterator& it) {
 	(void)server;
 	(void)it;
 }
+
 void	Config::getCgi(Server& server, std::vector<Token>::iterator& it) {
 	(void)server;
 	(void)it;
 }
+
 void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& start) {
 	(void)start;
 	(void)server;
@@ -351,10 +411,6 @@ std::vector<Token>::iterator	Config::getServerBlock(std::vector<Token>::iterator
 	++start;
 	if (start->value == "}")
 		throw ParseError("Syntax error, server block empty", start->line, start->col, start->value);
-	
-	++start;
-	if (start->type != DIRECTIVE)
-		throw ParseError("Syntax error, expected directive here", start->line, start->col, start->value);
 
 	Server	server;
 		

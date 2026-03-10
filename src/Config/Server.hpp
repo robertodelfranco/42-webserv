@@ -5,7 +5,6 @@
 
 class Server {
 	private:
-		// size_t						index; // index dos arquivos servers recebidos por parâmetro
 		std::string						root; // caminho root definido
 		std::vector<Listen>				listens; // portas abertas
 		// std::vector<std::string>		host; // host ip (ja tem dentro do listen)
@@ -19,6 +18,10 @@ class Server {
 		Server(const Server& other);
 		Server& operator=(const Server& other);
 		~Server();
+
+		void	setListen(const std::string& host, const std::string& port);
+		void	setRoot(const std::string& root);
+		void	setBodySize(long long size);
 };
 
 #endif

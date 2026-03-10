@@ -5,10 +5,12 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <limits>
 #include <map>
 #include <cstdlib>
 #include <cstring>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

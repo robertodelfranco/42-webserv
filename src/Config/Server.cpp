@@ -1,19 +1,15 @@
 #include "Server.hpp"
 
-Server::Server() : index(0), client_max_body_size(0) {}
+Server::Server() : client_max_body_size(0) {}
 
 Server::Server(const Server& other)
-	: index(other.index), root(other.root), listens(other.listens),
-	server_names(other.server_names), index_files(other.index_files),
-	error_pages(other.error_pages), locations(other.locations),
-	client_max_body_size(other.client_max_body_size) {}
+	: root(other.root), listens(other.listens), index_files(other.index_files),
+	error_pages(other.error_pages), locations(other.locations), client_max_body_size(other.client_max_body_size) {}
 
 Server& Server::operator=(const Server& other) {
 	if (this != &other) {
-		index = other.index;
 		root = other.root;
 		listens = other.listens;
-		server_names = other.server_names;
 		index_files = other.index_files;
 		error_pages = other.error_pages;
 		locations = other.locations;
@@ -23,3 +19,50 @@ Server& Server::operator=(const Server& other) {
 }
 
 Server::~Server() {}
+
+void	Server::setListen(const std::string& host, const std::string& port) {
+	if (port.empty())
+		throw std::runtime_error("Listen: port is required");
+
+	for (size_t i = 0; i < port.size(); ++i) {
+		if (!std::isdigit(port[i]))
+			throw std::runtime_error("Listen: invalid port '" + port + "'");
+	}
+
+	int port_num = std::atoi(port.c_str());
+
+	if (port_num < 1 || port_num > 65535)
+		throw std::runtime_error("Listen: port out of range (1-65535)");
+
+	std::string resolved_host = host.empty() ? "0.0.0.0" : host;
+
+	for (size_t i = 0; i < listens.size(); ++i) {
+		if (listens[i].host == resolved_host && listens[i].port == port_num)
+			throw std::runtime_error("Listen: duplicate listen " + resolved_host + ":" + port);
+	}
+
+	listens.push_back(Listen(resolved_host, port_num));
+}
+
+void	Server::setRoot(const std::string& root) {
+	if (root.empty())
+		throw std::runtime_error("Root: path is required");
+	if (root[0] != '/')
+		throw std::runtime_error("Root: path must be absolute");
+	
+	struct stat info;
+	if (stat(root.c_str(), &info) != 0)
+		throw std::runtime_error("Root: path does not exist '" + root + "'");
+	if (!(info.st_mode & S_IFDIR))
+		throw std::runtime_error("Root: path is not a directory '" + root + "'");
+	if (access(root.c_str(), R_OK) != 0)
+		throw std::runtime_error("Root: no read permission on '" + root + "'");
+
+	this->root = root;
+}
+
+void	Server::setBodySize(long long size) {
+	if (size < 0)
+		throw std::runtime_error("Body size cannot be negative");
+	this->client_max_body_size = size;
+}
