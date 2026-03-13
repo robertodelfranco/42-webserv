@@ -4,14 +4,14 @@ Server::Server() : client_max_body_size(0) {}
 
 Server::Server(const Server& other)
 	: root(other.root), listens(other.listens), index_files(other.index_files),
-	error_pages(other.error_pages), locations(other.locations), client_max_body_size(other.client_max_body_size) {}
+	error_page(other.error_page), locations(other.locations), client_max_body_size(other.client_max_body_size) {}
 
 Server& Server::operator=(const Server& other) {
 	if (this != &other) {
 		root = other.root;
 		listens = other.listens;
 		index_files = other.index_files;
-		error_pages = other.error_pages;
+		error_page = other.error_page;
 		locations = other.locations;
 		client_max_body_size = other.client_max_body_size;
 	}
@@ -65,4 +65,20 @@ void	Server::setBodySize(long long size) {
 	if (size < 0)
 		throw std::runtime_error("Body size cannot be negative");
 	this->client_max_body_size = size;
+}
+
+void	Server::setErrorPages(const std::vector<int>& error_pages, const std::string& path) {
+	if (error_pages.empty())
+		throw std::runtime_error("Error page: at least one error code is required");
+
+	if (path.empty())
+		throw std::runtime_error("Error page: path is required");
+	
+	if (path[0] != '/')
+		throw std::runtime_error("Error page: path must be absolute");
+	
+	for (size_t i = 0; i < error_pages.size(); ++i) {
+		this->error_page.insert(std::make_pair(error_pages[i], path));
+	}
+
 }

@@ -11,7 +11,7 @@ class HttpConfig {
 		std::vector<Listen>				listens; // portas abertas
 		std::vector<std::string>		server_names; // host names
 		std::vector<std::string>		index_files; // arquivos passados pelo curl
-		std::map<int, std::string>		error_pages; // páginas de erros definidas no config
+		std::map<int, std::string>		error_page; // páginas de erros definidas no config
 		long long						client_max_body_size; // content-length máximo do body da request
 
 	public:

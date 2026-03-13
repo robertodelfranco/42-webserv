@@ -6,7 +6,7 @@ Config::Config() : servers(), tokens(), handlers() {
 	handlers.insert(std::make_pair(std::string("client_max_body_size"), &Config::getBodySize));
 	handlers.insert(std::make_pair(std::string("root"), &Config::getRoot));
 	handlers.insert(std::make_pair(std::string("index"), &Config::getIndexPage));
-	handlers.insert(std::make_pair(std::string("error_pages"), &Config::getErrorPages));
+	handlers.insert(std::make_pair(std::string("error_page"), &Config::getErrorPages));
 	handlers.insert(std::make_pair(std::string("methods"), &Config::getMethods));
 	handlers.insert(std::make_pair(std::string("return"), &Config::getRedirect));
 	handlers.insert(std::make_pair(std::string("cgi_type"), &Config::getCgi));
@@ -341,6 +341,8 @@ void	Config::getBodySize(Server& server, std::vector<Token>::iterator& it) {
         throw ParseError("Body size is too large", it->line, it->col, it->value);
 
     server.setBodySize(size * multiplier);
+
+	++it;
 }
 
 void	Config::getRoot(Server& server, std::vector<Token>::iterator& it) {
@@ -351,8 +353,6 @@ void	Config::getRoot(Server& server, std::vector<Token>::iterator& it) {
 	server.setRoot(it->value);
 
 	++it;
-	if (it->type != SYMBOL)
-		throw ParseError("Root only accept one argument", it->line, it->col, it->value);
 }
 
 void	Config::getIndexPage(Server& server, std::vector<Token>::iterator& it) {
@@ -361,8 +361,41 @@ void	Config::getIndexPage(Server& server, std::vector<Token>::iterator& it) {
 }
 
 void	Config::getErrorPages(Server& server, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)it;
+	++it;
+	if (it->type != STRING)
+		throw ParseError("Invalid error pages argument", it->line, it->col, it->value);
+
+	std::vector<int> error_pages;
+
+	while (it->type == STRING) {
+		std::string value = Utils::trim(it->value);
+		
+		if (value.empty())
+			throw ParseError("Empty error page value", it->line, it->col, it->value);
+		
+		for (size_t i = 0; i < value.size(); ++i) {
+			if (!std::isdigit(value[i]))
+				throw ParseError("Invalid error code in error page directive", it->line, it->col, it->value);
+		}
+
+		if (value.size() > 3)
+			throw ParseError("Error code too long in error page directive", it->line, it->col, it->value);
+		
+		int error_code = std::atoi(value.c_str());
+
+		if (error_code < 100 || error_code > 599)
+			throw ParseError("Error code out of range in error page directive", it->line, it->col, it->value);
+		
+		error_pages.push_back(error_code);
+		++it;
+	}
+	
+	if (it->type != PATH)
+		throw ParseError("Invalid error page path argument", it->line, it->col, it->value);
+
+	server.setErrorPages(error_pages, it->value);
+
+	++it;
 }
 
 void	Config::getMethods(Server& server, std::vector<Token>::iterator& it) {
