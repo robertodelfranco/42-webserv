@@ -23,6 +23,7 @@ class Server {
 		void	setRoot(const std::string& root);
 		void	setBodySize(long long size);
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
+		void	setIndexFiles(const std::vector<std::string>& index_pages);
 };
 
 #endif

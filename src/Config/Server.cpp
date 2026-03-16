@@ -80,5 +80,13 @@ void	Server::setErrorPages(const std::vector<int>& error_pages, const std::strin
 	for (size_t i = 0; i < error_pages.size(); ++i) {
 		this->error_page.insert(std::make_pair(error_pages[i], path));
 	}
+}
 
+void	Server::setIndexFiles(const std::vector<std::string>& index_pages) {
+	if (index_pages.empty())
+		throw std::runtime_error("Index: at least one index file is required");
+	
+	for (size_t i = 0; i< index_pages.size(); ++i) {
+		this->index_files.push_back(index_pages[i]);
+	}
 }

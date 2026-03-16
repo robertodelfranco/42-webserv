@@ -291,8 +291,6 @@ void	Config::getListen(Server& server, std::vector<Token>::iterator& it) {
 	server.setListen(host, port);
 
 	++it;
-	if (it->type != SYMBOL)
-		throw ParseError("Listen only accept one argument", it->line, it->col, it->value);
 }
 
 void	Config::getServerName(Server& server, std::vector<Token>::iterator& it) {
@@ -356,8 +354,21 @@ void	Config::getRoot(Server& server, std::vector<Token>::iterator& it) {
 }
 
 void	Config::getIndexPage(Server& server, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)it;
+	++it;
+	if (it->type != STRING)
+		throw ParseError("Invalid index page argument", it->line, it->col, it->value);
+	
+	std::vector<std::string> index_files;
+	while (it->type == STRING) {
+		std::string value = Utils::trim(it->value);
+		if (value.empty())
+			throw ParseError("Empty index page value", it->line, it->col, it->value);
+		
+		index_files.push_back(value);
+		++it;
+	}
+
+	server.setIndexFiles(index_files);
 }
 
 void	Config::getErrorPages(Server& server, std::vector<Token>::iterator& it) {
@@ -399,8 +410,22 @@ void	Config::getErrorPages(Server& server, std::vector<Token>::iterator& it) {
 }
 
 void	Config::getMethods(Server& server, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)it;
+	++it;
+	if (it->type != STRING)
+		throw ParseError("Invalid methods argument", it->line, it->col, it->value);
+	
+	std::vector<std::string> methods;
+
+	while (it->type == STRING) {
+		std::string value = Utils::trim(it->value);
+		if (value.empty())
+			throw ParseError("Empty method value", it->line, it->col, it->value);
+		
+		methods.push_back(value);
+		++it;
+	}
+
+	server.setMethods(methods);
 }
 
 void	Config::getRedirect(Server& server, std::vector<Token>::iterator& it) {
@@ -451,7 +476,10 @@ std::vector<Token>::iterator	Config::getServerBlock(std::vector<Token>::iterator
 		if (start->type != DIRECTIVE)
 			throw ParseError("Syntax error", start->line, start->col, start->value);
 
-		consumeDirective(server, start); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
+		if (start->type == DIRECTIVE && start->value == "location")
+			getLocationBlock(server, start);
+		else
+			consumeDirective(server, start); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
 
 		if (start->type == SYMBOL && start->value == "}") {
 			++start;
