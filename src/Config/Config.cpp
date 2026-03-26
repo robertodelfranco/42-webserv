@@ -1,16 +1,16 @@
 #include "Config.hpp"
 
 Config::Config() : servers(), tokens(), handlers() {
-	handlers.insert(std::make_pair(std::string("listen"), &Config::getListen));
-	handlers.insert(std::make_pair(std::string("server_name"), &Config::getServerName));
-	handlers.insert(std::make_pair(std::string("client_max_body_size"), &Config::getBodySize));
-	handlers.insert(std::make_pair(std::string("root"), &Config::getRoot));
-	handlers.insert(std::make_pair(std::string("index"), &Config::getIndexPage));
-	handlers.insert(std::make_pair(std::string("error_page"), &Config::getErrorPages));
-	handlers.insert(std::make_pair(std::string("methods"), &Config::getMethods));
-	handlers.insert(std::make_pair(std::string("return"), &Config::getRedirect));
-	handlers.insert(std::make_pair(std::string("cgi_type"), &Config::getCgi));
-	handlers.insert(std::make_pair(std::string("location"), &Config::getLocationBlock));
+	handlers[std::string("listen")] = (DirectiveHandler){&Config::getListen, SERVER, SIMPLE};
+	handlers[std::string("server_name")] = (DirectiveHandler){&Config::getServerName, SERVER, SIMPLE};
+	handlers[std::string("client_max_body_size")] = (DirectiveHandler){&Config::getBodySize, SERVER | LOCATION, SIMPLE};
+	handlers[std::string("root")] = (DirectiveHandler){&Config::getRoot, SERVER | LOCATION, SIMPLE};
+	handlers[std::string("index")] = (DirectiveHandler){&Config::getIndexPage, SERVER | LOCATION, SIMPLE};
+	handlers[std::string("error_page")] = (DirectiveHandler){&Config::getErrorPages, SERVER | LOCATION, SIMPLE};
+	handlers[std::string("methods")] = (DirectiveHandler){&Config::getMethods, LOCATION, SIMPLE};
+	handlers[std::string("return")] = (DirectiveHandler){&Config::getRedirect, LOCATION, SIMPLE};
+	handlers[std::string("cgi_type")] = (DirectiveHandler){&Config::getCgi, LOCATION, SIMPLE};
+	handlers[std::string("location")] = (DirectiveHandler){&Config::getLocationBlock, SERVER, BLOCK};
 }
 
 Config::~Config() {}
@@ -431,6 +431,7 @@ void	Config::getMethods(Server& server, std::vector<Token>::iterator& it) {
 void	Config::getRedirect(Server& server, std::vector<Token>::iterator& it) {
 	(void)server;
 	(void)it;
+	(void)it;
 }
 
 void	Config::getCgi(Server& server, std::vector<Token>::iterator& it) {
@@ -443,21 +444,24 @@ void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& star
 	(void)server;
 }
 
-void	Config::consumeSemiColon(std::vector<Token>::iterator& it) {
+void	Config::consumeSemiColon(std::vector<Token>::iterator& it, DirectiveContext context) {
 	if (it->type != SYMBOL || it->value != ";")
 		throw ParseError("Expected semi colon at the end of line", it->line, it->col, it->value);
 	++it;
 }
 
-void	Config::consumeDirective(Server& server, std::vector<Token>::iterator& it) {
-	std::map<std::string, TokenHandler>::iterator function = handlers.find(it->value);
+void	Config::getDirective(Server& server, std::vector<Token>::iterator& it, DirectiveContext context) {
+	std::map<std::string, DirectiveHandler>::iterator function = handlers.find(it->value);
 
 	if (function == handlers.end())
 		throw ParseError("Unknown directive", it->line, it->col, it->value);
 
-	(this->*(function->second))(server, it); // cada função consome a linha toda e avança o iterator até o token ';'
+	if (!(function->second.context & context))
+		throw ParseError("Directive '" + it->value + "' not allowed in this context", it->line, it->col, it->value);
 
-	consumeSemiColon(it); // aqui vai uma função "expect" para consumir o token esperado ';'
+	(this->*(function->second.handler))(server, it); // cada função consome a linha toda e avança o iterator até o token ';' ou '}' no caso do location
+
+	consumeSemiColon(it, context); // aqui vai uma função "expect" para consumir o token esperado ';' ou '}' no caso do location
 }
 
 std::vector<Token>::iterator	Config::getServerBlock(std::vector<Token>::iterator& start, std::vector<Token>::iterator end) {
@@ -479,7 +483,7 @@ std::vector<Token>::iterator	Config::getServerBlock(std::vector<Token>::iterator
 		if (start->type == DIRECTIVE && start->value == "location")
 			getLocationBlock(server, start);
 		else
-			consumeDirective(server, start); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
+			getDirective(server, start, SERVER); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
 
 		if (start->type == SYMBOL && start->value == "}") {
 			++start;

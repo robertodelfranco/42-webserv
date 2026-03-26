@@ -60,6 +60,24 @@ enum StatusCode
 	INTERNAL_SERVER_ERROR = 500,
 };
 
+enum DirectiveKind {
+	SIMPLE,
+	BLOCK
+};
+
+enum DirectiveContext {
+	SERVER = 1, // 1 << 0
+	LOCATION = 2 // 1 << 1
+};
+
+typedef void (Config::*TokenHandler)(Server&, std::vector<Token>::iterator&);
+
+struct DirectiveHandler {
+	TokenHandler	handler;
+	size_t			context;
+	DirectiveKind	kind;
+};
+
 struct Token {
 	TokenType	type;
 	std::string	value;

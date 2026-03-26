@@ -8,15 +8,15 @@ class Config {
 	private:
 		typedef void (Config::*TokenHandler)(Server&, std::vector<Token>::iterator&); // protótipo para declarar array de funções
 		// HttpConfig						global_config; // classe que reune todos os dados do arquivo config
-		std::vector<Server>					servers; // blocos de servidores que reunem todos os dados do arquivo config
-		std::ifstream						config_file;
-		std::vector<Token>					tokens;
-		std::map<std::string, TokenHandler>	handlers;
+		std::vector<Server>						servers; // blocos de servidores que reunem todos os dados do arquivo config
+		std::ifstream							config_file;
+		std::vector<Token>						tokens;
+		std::map<std::string, DirectiveHandler>	handlers;
 
 		// Parser
 		std::vector<Token>::iterator	getServerBlock(std::vector<Token>::iterator& start, std::vector<Token>::iterator end);
-		void							consumeSemiColon(std::vector<Token>::iterator& it);
-		void							consumeDirective(Server& server, std::vector<Token>::iterator& it);
+		void							consumeSemiColon(std::vector<Token>::iterator& it, DirectiveContext context);
+		void							getDirective(Server& server, std::vector<Token>::iterator& it, DirectiveContext context);
 		void							getListen(Server& server, std::vector<Token>::iterator& it);
 		void							getServerName(Server& server, std::vector<Token>::iterator& it);
 		void							getBodySize(Server& server, std::vector<Token>::iterator& it);
