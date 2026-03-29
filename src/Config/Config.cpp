@@ -435,8 +435,18 @@ void	Config::getRedirect(Server& server, std::vector<Token>::iterator& it) {
 }
 
 void	Config::getCgi(Server& server, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)it;
+	if (it->type != STRING)
+		throw ParseError("Invalid CGI type argument", it->line, it->col, it->value);
+	
+	std::string cgi_extension = Utils::trim(it->value);
+
+	if (cgi_extension.empty())
+		throw ParseError("Empty CGI type value", it->line, it->col, it->value);
+	
+	if (cgi_extension != ".py" && cgi_extension != ".php")
+		throw ParseError("Unsupported CGI type '" + cgi_extension + "'", it->line, it->col, it->value);
+	
+	server.setCgi(cgi_extension);
 }
 
 void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& start) {
@@ -444,9 +454,15 @@ void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& star
 	(void)server;
 }
 
-void	Config::consumeSemiColon(std::vector<Token>::iterator& it, DirectiveContext context) {
+void	Config::consumeSemiColon(std::vector<Token>::iterator& it) {
 	if (it->type != SYMBOL || it->value != ";")
 		throw ParseError("Expected semi colon at the end of line", it->line, it->col, it->value);
+	++it;
+}
+
+void	Config::consumeRightBrace(std::vector<Token>::iterator&it) {
+	if (it->type != SYMBOL || it->value != "}")
+		throw ParseError("Expected right brace at the end of block location", it->line, it->col, it->value);
 	++it;
 }
 
@@ -461,7 +477,10 @@ void	Config::getDirective(Server& server, std::vector<Token>::iterator& it, Dire
 
 	(this->*(function->second.handler))(server, it); // cada função consome a linha toda e avança o iterator até o token ';' ou '}' no caso do location
 
-	consumeSemiColon(it, context); // aqui vai uma função "expect" para consumir o token esperado ';' ou '}' no caso do location
+	if (function->second.kind == SIMPLE)
+		consumeSemiColon(it); // aqui vai uma função "expect" para consumir o token esperado ';' ou '}' no caso do location
+	else
+		consumeRightBrace(it); // aqui vai uma função "expect" para consumir o token esperado ';' ou '}' no caso do location
 }
 
 std::vector<Token>::iterator	Config::getServerBlock(std::vector<Token>::iterator& start, std::vector<Token>::iterator end) {
@@ -480,10 +499,7 @@ std::vector<Token>::iterator	Config::getServerBlock(std::vector<Token>::iterator
 		if (start->type != DIRECTIVE)
 			throw ParseError("Syntax error", start->line, start->col, start->value);
 
-		if (start->type == DIRECTIVE && start->value == "location")
-			getLocationBlock(server, start);
-		else
-			getDirective(server, start, SERVER); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
+		getDirective(server, start, SERVER); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
 
 		if (start->type == SYMBOL && start->value == "}") {
 			++start;

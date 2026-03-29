@@ -12,6 +12,7 @@ class Server {
 		std::map<int, std::string>		error_page; // páginas de erros definidas no config
 		std::vector<Location>			locations; // cada bloco location dentro de server
 		long long						client_max_body_size; // content-length máximo do body da request
+		Location*						current_location; // ponteiro para o location block atual, usado para setar as diretivas de location
 
 	public:
 		Server();
@@ -24,6 +25,8 @@ class Server {
 		void	setBodySize(long long size);
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
 		void	setIndexFiles(const std::vector<std::string>& index_pages);
+		void	setMethods(const std::vector<std::string>& methods);
+		void	setCgi(const std::string& cgi_extension);
 };
 
 #endif

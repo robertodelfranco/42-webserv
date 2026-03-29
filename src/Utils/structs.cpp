@@ -5,10 +5,7 @@ Listen::Listen() : host(), port(0) {}
 Listen::Listen(const std::string& host, int port)
 : host(host), port(port) {}
 
-Location::Location() : path(), root(), redir(), autoindex(false), allow_methods(0), client_max_body_size(0) {}
-
-Location::Location(const std::string& path, const std::string& root, std::vector<std::string> redir, bool autoindex, size_t allow_methods, long long client_max_body_size)
-: path(path), root(root), redir(redir), autoindex(autoindex), allow_methods(allow_methods), client_max_body_size(client_max_body_size) {}
+Location::Location() : path(), root(), index_files(), redir(), autoindex(false), allow_methods(0), client_max_body_size(0) {}
 
 Token::Token() : type(UNKNOWN), value(), line(0), col(0) {}
 
