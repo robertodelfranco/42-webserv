@@ -502,6 +502,10 @@ void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& star
 
 	if (start->type != PATH)
 		throw ParseError("Invalid location path argument", start->line, start->col, start->value);
+
+	std::string location_path = Utils::trim(start->value);
+	if (location_path.empty())
+		throw ParseError("Empty location path value", start->line, start->col, start->value);
 	++start;
 
 	if (start->type != SYMBOL || start->value != "{")
@@ -510,6 +514,7 @@ void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& star
 
 	Location	location;
 	server.setLocation(location); // adiciona o location vazio no server e seta o ponteiro current_location para ele, para as próximas diretivas de location setarem os dados nesse location
+	server.setLocationPath(location_path); // seta o path do location depois de setar o location vazio no server para garantir que o ponteiro current_location do server aponte para o location certo
 
 	while (start != tokens.end()) {
 		if (start->type == SYMBOL && start->value == "}")

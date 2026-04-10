@@ -16,7 +16,6 @@ struct DirectiveHandler {
 class Config {
 	private:
 		std::vector<Server>						servers; // blocos de servidores que reunem todos os dados do arquivo config
-		std::ifstream							config_file;
 		std::vector<Token>						tokens;
 		std::map<std::string, DirectiveHandler>	handlers;
 

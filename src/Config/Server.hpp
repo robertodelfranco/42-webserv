@@ -30,6 +30,7 @@ class Server {
 		void	setCgi(const std::string& cgi_extension);
 		void	setCgiPath(const std::string& cgi_path);
 		void	setLocation(const Location& location);
+		void	setLocationPath(const std::string& path); // função para setar o path do location atual
 		void	unsetLocation(); // função para dessetar o ponteiro current_location do server, usada depois de terminar de ler um bloco location para evitar que diretivas fora do location setem dados no location por engano
 };
 

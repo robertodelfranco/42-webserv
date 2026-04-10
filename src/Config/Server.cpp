@@ -5,7 +5,9 @@ Server::Server() : client_max_body_size(0), current_location(NULL) {}
 Server::Server(const Server& other)
 	: root(other.root), listens(other.listens), index_files(other.index_files),
 	error_page(other.error_page), locations(other.locations), 
-	client_max_body_size(other.client_max_body_size), current_location(other.current_location) {}
+	client_max_body_size(other.client_max_body_size), current_location(other.current_location) {
+		current_location = NULL; // o current_location é um ponteiro para um location dentro do vetor de locations do server, então quando eu copio o server eu preciso setar o current_location do novo server para NULL para evitar que ele aponte para um location do server original, e depois quando eu for setar o location no novo server eu vou setar o current_location para o location certo
+	}
 
 Server& Server::operator=(const Server& other) {
 	if (this != &other) {
@@ -15,7 +17,7 @@ Server& Server::operator=(const Server& other) {
 		error_page = other.error_page;
 		locations = other.locations;
 		client_max_body_size = other.client_max_body_size;
-		current_location = other.current_location;
+		current_location = NULL;
 	}
 	return *this;
 }
@@ -113,10 +115,10 @@ void	Server::setMethods(const std::vector<std::string>& methods) {
 			throw std::runtime_error("Methods: invalid method '" + methods[i] + "'");
 	}
 
-	if (this->current_location == NULL)
-		this->client_max_body_size = allow_methods;
-	else
+	if (this->current_location != NULL)
 		this->current_location->allow_methods = allow_methods;
+	else
+		throw std::runtime_error("Methods: methods directive is only allowed in location context");
 }
 
 void	Server::setRedirect(const std::string& code, const std::string& url) {
@@ -142,8 +144,15 @@ void	Server::setCgiPath(const std::string& cgi_path) {
 }
 
 void	Server::setLocation(const Location& location) {
-	this->current_location = const_cast<Location*>(&location); // seto o ponteiro para o location passado, para as próximas diretivas de location setarem os dados nesse location
 	this->locations.push_back(location); // adiciona o location no vetor de locations do server
+	this->current_location = &this->locations.back(); // seta o ponteiro current_location para o location que acabou de ser adicionado no vetor, para as próximas diretivas de location setarem os dados nesse location
+}
+
+void	Server::setLocationPath(const std::string& path) {
+	if (this->current_location == NULL)
+		throw std::runtime_error("Location path: no location block to set path");
+	
+	this->current_location->path = path;
 }
 
 void	Server::unsetLocation() {
