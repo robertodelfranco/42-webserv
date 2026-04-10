@@ -527,7 +527,7 @@ void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& star
 	}
 
 	if (start == tokens.end())
-		throw ParseError("Expected closing brace for location block", start->line, start->col, start->value);
+		throw ParseError("Expected closing brace for location block", tokens.back().line, tokens.back().col, std::string());
 
 	server.unsetLocation(); // desseta o ponteiro current_location do server para evitar que diretivas fora do location setem dados no location por engano
 }
