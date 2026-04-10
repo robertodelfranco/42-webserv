@@ -57,7 +57,7 @@ void	Server::setRoot(const std::string& root) {
 	struct stat info;
 	if (stat(root.c_str(), &info) != 0)
 		throw std::runtime_error("Root: path does not exist '" + root + "'");
-	if (!(info.st_mode & S_IFDIR))
+	if (!S_ISDIR(info.st_mode))
 		throw std::runtime_error("Root: path is not a directory '" + root + "'");
 	if (access(root.c_str(), R_OK) != 0)
 		throw std::runtime_error("Root: no read permission on '" + root + "'");
