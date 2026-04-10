@@ -10,6 +10,7 @@ Config::Config() : servers(), tokens(), handlers() {
 	handlers[std::string("methods")] = (DirectiveHandler){&Config::getMethods, LOCATION, SIMPLE};
 	handlers[std::string("return")] = (DirectiveHandler){&Config::getRedirect, LOCATION, SIMPLE};
 	handlers[std::string("cgi_type")] = (DirectiveHandler){&Config::getCgi, LOCATION, SIMPLE};
+	handlers[std::string("cgi_path")] = (DirectiveHandler){&Config::getCgiPath, LOCATION, SIMPLE};
 	handlers[std::string("location")] = (DirectiveHandler){&Config::getLocationBlock, SERVER, BLOCK};
 }
 
@@ -429,13 +430,43 @@ void	Config::getMethods(Server& server, std::vector<Token>::iterator& it) {
 }
 
 void	Config::getRedirect(Server& server, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)it;
-	(void)it;
+	++it;
+	if (it->type != STRING)
+		throw ParseError("Invalid redirect code argument", it->line, it->col, it->value);
+	
+	std::string value = Utils::trim(it->value);
+	if (value.empty())
+		throw ParseError("Empty redirect code value", it->line, it->col, it->value);
+	
+	if (value.size() > 3)
+		throw ParseError("Redirect code too long in return directive", it->line, it->col, it->value);
+	
+	for (size_t i = 0; i < value.size(); ++i) {
+		if (!std::isdigit(value[i]))
+			throw ParseError("Invalid redirect code in return directive", it->line, it->col, it->value);
+	}
+
+	size_t	redirect_code = std::atoi(value.c_str());
+
+	if (redirect_code < 300 || redirect_code > 399)
+		throw ParseError("Redirect code out of range in return directive", it->line, it->col, it->value);
+	
+	++it;
+	if (it->type != STRING)
+		throw ParseError("Invalid redirect URL argument", it->line, it->col, it->value);
+	
+	std::string	redirect_url = Utils::trim(it->value);
+
+	if (redirect_url.empty())
+		throw ParseError("Empty redirect URL value", it->line, it->col, it->value);
+	
+	server.setRedirect(value, redirect_url);
+	++it;
 }
 
 void	Config::getCgi(Server& server, std::vector<Token>::iterator& it) {
-	if (it->type != STRING)
+	++it;
+	if (it->type != PATH)
 		throw ParseError("Invalid CGI type argument", it->line, it->col, it->value);
 	
 	std::string cgi_extension = Utils::trim(it->value);
@@ -447,11 +478,53 @@ void	Config::getCgi(Server& server, std::vector<Token>::iterator& it) {
 		throw ParseError("Unsupported CGI type '" + cgi_extension + "'", it->line, it->col, it->value);
 	
 	server.setCgi(cgi_extension);
+	++it;
+}
+
+void	Config::getCgiPath(Server& server, std::vector<Token>::iterator& it) {
+	++it;
+	if (it->type != PATH)
+		throw ParseError("Invalid CGI path argument", it->line, it->col, it->value);
+	
+	std::string cgi_path = Utils::trim(it->value);
+
+	if (cgi_path.empty())
+		throw ParseError("Empty CGI path value", it->line, it->col, it->value);
+	
+	server.setCgiPath(cgi_path);
+	++it;
 }
 
 void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& start) {
-	(void)start;
-	(void)server;
+	if (start->type != DIRECTIVE || start->value != "location")
+		throw ParseError("Expected 'location' directive", start->line, start->col, start->value);
+	++start;
+
+	if (start->type != PATH)
+		throw ParseError("Invalid location path argument", start->line, start->col, start->value);
+	++start;
+
+	if (start->type != SYMBOL || start->value != "{")
+		throw ParseError("Expected open brace after location path", start->line, start->col, start->value);
+	++start;
+
+	Location	location;
+	server.setLocation(location); // adiciona o location vazio no server e seta o ponteiro current_location para ele, para as próximas diretivas de location setarem os dados nesse location
+
+	while (start != tokens.end()) {
+		if (start->type == SYMBOL && start->value == "}")
+			break ;
+		
+		if (start->type != DIRECTIVE)
+			throw ParseError("Syntax error in location block", start->line, start->col, start->value);
+		
+		getDirective(server, start, LOCATION); // cada diretiva de location vai ser consumida totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
+	}
+
+	if (start == tokens.end())
+		throw ParseError("Expected closing brace for location block", start->line, start->col, start->value);
+
+	server.unsetLocation(); // desseta o ponteiro current_location do server para evitar que diretivas fora do location setem dados no location por engano
 }
 
 void	Config::consumeSemiColon(std::vector<Token>::iterator& it) {

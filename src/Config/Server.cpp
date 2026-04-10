@@ -119,9 +119,33 @@ void	Server::setMethods(const std::vector<std::string>& methods) {
 		this->current_location->allow_methods = allow_methods;
 }
 
+void	Server::setRedirect(const std::string& code, const std::string& url) {
+	if (this->current_location == NULL)
+		throw std::runtime_error("Redirect: return directive is only allowed in location context");
+	
+	this->current_location->redir.insert(std::make_pair(code, url));	
+	
+}
+
 void	Server::setCgi(const std::string& cgi_extension) {
 	if (this->current_location == NULL)
 		throw std::runtime_error("CGI: cgi_type directive is only allowed in location context");
 	
 	this->current_location->cgi_type = cgi_extension;
+}
+
+void	Server::setCgiPath(const std::string& cgi_path) {
+	if (this->current_location == NULL)
+		throw std::runtime_error("CGI path: cgi_path directive is only allowed in location context");
+	
+	this->current_location->cgi_path = cgi_path;
+}
+
+void	Server::setLocation(const Location& location) {
+	this->current_location = const_cast<Location*>(&location); // seto o ponteiro para o location passado, para as próximas diretivas de location setarem os dados nesse location
+	this->locations.push_back(location); // adiciona o location no vetor de locations do server
+}
+
+void	Server::unsetLocation() {
+	this->current_location = NULL; // desseta o ponteiro para evitar que diretivas fora do location setem dados no location por engano
 }

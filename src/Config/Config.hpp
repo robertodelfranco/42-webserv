@@ -34,6 +34,7 @@ class Config {
 		void							getMethods(Server& server, std::vector<Token>::iterator& it);
 		void							getRedirect(Server& server, std::vector<Token>::iterator& it);
 		void							getCgi(Server& server, std::vector<Token>::iterator& it);
+		void							getCgiPath(Server& server, std::vector<Token>::iterator& it);
 		void							getLocationBlock(Server& server, std::vector<Token>::iterator& start);
 
 		// Lexer
