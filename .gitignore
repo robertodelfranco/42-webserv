@@ -2,3 +2,4 @@ webserv
 *.o
 objs/
 .vscode/
+*.pdf

@@ -5,10 +5,12 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <limits>
 #include <map>
 #include <cstdlib>
 #include <cstring>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -58,6 +60,16 @@ enum StatusCode
 	INTERNAL_SERVER_ERROR = 500,
 };
 
+enum DirectiveKind {
+	SIMPLE,
+	BLOCK
+};
+
+enum DirectiveContext {
+	SERVER = 1, // 1 << 0
+	LOCATION = 2 // 1 << 1
+};
+
 struct Token {
 	TokenType	type;
 	std::string	value;
@@ -77,15 +89,17 @@ struct Listen {
 };
 
 struct Location {
-	std::string					path; // caminho padrão do location
-	std::string					root; // caso algo sobreponha o destino root
-	std::vector<std::string>	redir; // caso tenha redirect de paginas			
-	bool						autoindex; // caso tenha ou não autoindex ligado
-	size_t						allow_methods; // métodos permitidos "unificados" por bit (acesse por "&")
-	long long					client_max_body_size; // caso tenha especificado dentro de location
+	std::string							path; // caminho padrão do location
+	std::string							root; // caso algo sobreponha o destino root
+	std::string							cgi_type; // caso tenha cgi
+	std::string							cgi_path; // caminho para o executavel do cgi (pyhton3, Go e etc)
+	std::vector<std::string>			index_files; // index definido no escopo do location
+	std::map<std::string, std::string>	redir; // caso tenha redirect de paginas			
+	bool								autoindex; // caso tenha ou não autoindex ligado
+	size_t								allow_methods; // métodos permitidos "unificados" por bit (acesse por "&")
+	long long							client_max_body_size; // caso tenha especificado dentro de location
 
 	Location();
-	Location(const std::string& path, const std::string& root, std::vector<std::string> redir, bool autoindex, size_t allow_methods, long long client_max_body_size);
 };
 
 #endif

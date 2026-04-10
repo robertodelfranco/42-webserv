@@ -2,39 +2,52 @@
 # define CONFIG_HPP
 
 #include "../Utils/Utils.hpp"
-#include "HttpConfig.hpp"
+#include "Server.hpp"
+
+class Config;
+typedef void (Config::*TokenHandler)(Server&, std::vector<Token>::iterator&); // protótipo para declarar array de funções
+
+struct DirectiveHandler {
+	TokenHandler	handler;
+	size_t			context;
+	DirectiveKind	kind;
+};
 
 class Config {
 	private:
-		HttpConfig			global_config; // classe que reune todos os dados do arquivo config
-		std::ifstream		config_file;
-		std::vector<Token>	tokens;
+		std::vector<Server>						servers; // blocos de servidores que reunem todos os dados do arquivo config
+		std::vector<Token>						tokens;
+		std::map<std::string, DirectiveHandler>	handlers;
 
 		// Parser
-		void	consumeToken(std::vector<Token>::iterator it);
-		void	getUnknown(std::vector<Token>::iterator it);
-		void	getDirective(std::vector<Token>::iterator it);
-		void	getString(std::vector<Token>::iterator it);
-		void	getPath(std::vector<Token>::iterator it);
-		void	getSymbol(std::vector<Token>::iterator it);
-		void	getEdgeCase(std::vector<Token>::iterator it);
-		
+		std::vector<Token>::iterator	getServerBlock(std::vector<Token>::iterator& start, std::vector<Token>::iterator end);
+		void							consumeSemiColon(std::vector<Token>::iterator& it);
+		void							consumeRightBrace(std::vector<Token>::iterator& it);
+		void							getDirective(Server& server, std::vector<Token>::iterator& it, DirectiveContext context);
+		void							getListen(Server& server, std::vector<Token>::iterator& it);
+		void							getServerName(Server& server, std::vector<Token>::iterator& it);
+		void							getBodySize(Server& server, std::vector<Token>::iterator& it);
+		void							getRoot(Server& server, std::vector<Token>::iterator& it);
+		void							getIndexPage(Server& server, std::vector<Token>::iterator& it);
+		void							getErrorPages(Server& server, std::vector<Token>::iterator& it);
+		void							getMethods(Server& server, std::vector<Token>::iterator& it);
+		void							getRedirect(Server& server, std::vector<Token>::iterator& it);
+		void							getCgi(Server& server, std::vector<Token>::iterator& it);
+		void							getCgiPath(Server& server, std::vector<Token>::iterator& it);
+		void							getLocationBlock(Server& server, std::vector<Token>::iterator& start);
+
 		// Lexer
-		void	consumeLine(std::string& line, size_t count_line);
-		size_t	consumeDirective(const std::string& line, size_t count_line, size_t col);
-		size_t	consumeName(const std::string& line, size_t count_line, size_t col);
-		size_t	consumeString(const std::string& line, size_t count_line, size_t col);
-		size_t	consumePath(const std::string& line, size_t count_line, size_t col);
-		size_t	consumeSymbol(const std::string& line, size_t count_line, size_t col);
-		size_t	edgeCase(const std::string& line, size_t count_line, size_t col);
+		void							consumeLine(std::string& line, size_t count_line);
+		size_t							consumeDirective(const std::string& line, size_t count_line, size_t col);
+		size_t							consumeName(const std::string& line, size_t count_line, size_t col);
+		size_t							consumeString(const std::string& line, size_t count_line, size_t col);
+		size_t							consumePath(const std::string& line, size_t count_line, size_t col);
+		size_t							consumeSymbol(const std::string& line, size_t count_line, size_t col);
+		size_t							edgeCase(const std::string& line, size_t count_line, size_t col);
 
 	public:
 		Config();
-		Config(const Config& other);
-		Config& operator=(const Config& other);
 		~Config();
-
-		typedef void (Config::*TokenHandler)(std::vector<Token>::iterator); // protótipo para declarar array de funções
 
 		class ParseError : public std::exception {
 			private:

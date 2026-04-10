@@ -7,12 +7,12 @@ int main(int ac, char **av)
         return 1;
     }
 
+    Config parserConfig;
     try {
-        Config parserConfig;
         parserConfig.initLexer(av[1]);
     }
     catch (const std::exception& e) {
-        int status = atoi(e.what());
+        // int status = atoi(e.what());
         std::cout << e.what() << std::endl;
         return EXIT_FAILURE;
     }
