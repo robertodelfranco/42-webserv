@@ -5,7 +5,7 @@
 #include "Server.hpp"
 
 class Config;
-typedef void (Config::*TokenHandler)(Server&, std::vector<Token>::iterator&); // protótipo para declarar array de funções
+typedef void (Config::*TokenHandler)(Server&, Location*, std::vector<Token>::iterator&); // protótipo para declarar array de funções
 
 struct DirectiveHandler {
 	TokenHandler	handler;
@@ -23,18 +23,18 @@ class Config {
 		std::vector<Token>::iterator	getServerBlock(std::vector<Token>::iterator& start, std::vector<Token>::iterator end);
 		void							consumeSemiColon(std::vector<Token>::iterator& it);
 		void							consumeRightBrace(std::vector<Token>::iterator& it);
-		void							getDirective(Server& server, std::vector<Token>::iterator& it, DirectiveContext context);
-		void							getListen(Server& server, std::vector<Token>::iterator& it);
-		void							getServerName(Server& server, std::vector<Token>::iterator& it);
-		void							getBodySize(Server& server, std::vector<Token>::iterator& it);
-		void							getRoot(Server& server, std::vector<Token>::iterator& it);
-		void							getIndexPage(Server& server, std::vector<Token>::iterator& it);
-		void							getErrorPages(Server& server, std::vector<Token>::iterator& it);
-		void							getMethods(Server& server, std::vector<Token>::iterator& it);
-		void							getRedirect(Server& server, std::vector<Token>::iterator& it);
-		void							getCgi(Server& server, std::vector<Token>::iterator& it);
-		void							getCgiPath(Server& server, std::vector<Token>::iterator& it);
-		void							getLocationBlock(Server& server, std::vector<Token>::iterator& start);
+		void							getDirective(Server& server, Location* location_pointer, std::vector<Token>::iterator& it, DirectiveContext context);
+		void							getListen(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getServerName(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getBodySize(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getRoot(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getIndexPage(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getErrorPages(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getMethods(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getRedirect(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getCgi(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getCgiPath(Server& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getLocationBlock(Server& server, Location* location_pointer, std::vector<Token>::iterator& start);
 
 		// Lexer
 		void							consumeLine(std::string& line, size_t count_line);

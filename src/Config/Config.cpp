@@ -272,7 +272,8 @@ void	Config::initLexer(const char *file) {
 	initParser();
 }
 
-void	Config::getListen(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getListen(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer; // listen não é permitido dentro de location
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid listen argument", it->line, it->col, it->value);
@@ -294,12 +295,14 @@ void	Config::getListen(Server& server, std::vector<Token>::iterator& it) {
 	++it;
 }
 
-void	Config::getServerName(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getServerName(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
 	(void)server;
+	(void)location_pointer;
 	(void)it;
 }
 
-void	Config::getBodySize(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getBodySize(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid body size argument", it->line, it->col, it->value);
@@ -344,7 +347,8 @@ void	Config::getBodySize(Server& server, std::vector<Token>::iterator& it) {
 	++it;
 }
 
-void	Config::getRoot(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getRoot(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer;
 	++it;
 	if (it->type != PATH)
 		throw ParseError("Invalid root argument", it->line, it->col, it->value);
@@ -354,7 +358,8 @@ void	Config::getRoot(Server& server, std::vector<Token>::iterator& it) {
 	++it;
 }
 
-void	Config::getIndexPage(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getIndexPage(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid index page argument", it->line, it->col, it->value);
@@ -372,7 +377,8 @@ void	Config::getIndexPage(Server& server, std::vector<Token>::iterator& it) {
 	server.setIndexFiles(index_files);
 }
 
-void	Config::getErrorPages(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getErrorPages(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid error pages argument", it->line, it->col, it->value);
@@ -410,7 +416,8 @@ void	Config::getErrorPages(Server& server, std::vector<Token>::iterator& it) {
 	++it;
 }
 
-void	Config::getMethods(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getMethods(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)server;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid methods argument", it->line, it->col, it->value);
@@ -426,10 +433,11 @@ void	Config::getMethods(Server& server, std::vector<Token>::iterator& it) {
 		++it;
 	}
 
-	server.setMethods(methods);
+	location_pointer->setMethods(methods); // garantidamente != NULL, contexto já filtrou isso
 }
 
-void	Config::getRedirect(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getRedirect(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid redirect code argument", it->line, it->col, it->value);
@@ -464,7 +472,8 @@ void	Config::getRedirect(Server& server, std::vector<Token>::iterator& it) {
 	++it;
 }
 
-void	Config::getCgi(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getCgi(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer;
 	++it;
 	if (it->type != PATH)
 		throw ParseError("Invalid CGI type argument", it->line, it->col, it->value);
@@ -481,7 +490,8 @@ void	Config::getCgi(Server& server, std::vector<Token>::iterator& it) {
 	++it;
 }
 
-void	Config::getCgiPath(Server& server, std::vector<Token>::iterator& it) {
+void	Config::getCgiPath(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)location_pointer;
 	++it;
 	if (it->type != PATH)
 		throw ParseError("Invalid CGI path argument", it->line, it->col, it->value);
@@ -495,7 +505,8 @@ void	Config::getCgiPath(Server& server, std::vector<Token>::iterator& it) {
 	++it;
 }
 
-void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& start) {
+void	Config::getLocationBlock(Server& server, Location* location_pointer, std::vector<Token>::iterator& start) {
+	(void)location_pointer; // unused parameter, but required for the function signature
 	if (start->type != DIRECTIVE || start->value != "location")
 		throw ParseError("Expected 'location' directive", start->line, start->col, start->value);
 	++start;
@@ -513,8 +524,7 @@ void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& star
 	++start;
 
 	Location	location;
-	server.setLocation(location); // adiciona o location vazio no server e seta o ponteiro current_location para ele, para as próximas diretivas de location setarem os dados nesse location
-	server.setLocationPath(location_path); // seta o path do location depois de setar o location vazio no server para garantir que o ponteiro current_location do server aponte para o location certo
+	location.path = location_path; // seta o path do location
 
 	while (start != tokens.end()) {
 		if (start->type == SYMBOL && start->value == "}")
@@ -523,13 +533,13 @@ void	Config::getLocationBlock(Server& server, std::vector<Token>::iterator& star
 		if (start->type != DIRECTIVE)
 			throw ParseError("Syntax error in location block", start->line, start->col, start->value);
 		
-		getDirective(server, start, LOCATION); // cada diretiva de location vai ser consumida totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
+		getDirective(server, &location, start, LOCATION); // cada diretiva de location vai ser consumida totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
 	}
 
 	if (start == tokens.end())
 		throw ParseError("Expected closing brace for location block", tokens.back().line, tokens.back().col, std::string());
 
-	server.unsetLocation(); // desseta o ponteiro current_location do server para evitar que diretivas fora do location setem dados no location por engano
+	server.addLocation(location); // única cópia, adiciona o location ao vetor de locations do server
 }
 
 void	Config::consumeSemiColon(std::vector<Token>::iterator& it) {
@@ -544,7 +554,7 @@ void	Config::consumeRightBrace(std::vector<Token>::iterator&it) {
 	++it;
 }
 
-void	Config::getDirective(Server& server, std::vector<Token>::iterator& it, DirectiveContext context) {
+void	Config::getDirective(Server& server, Location* location_pointer, std::vector<Token>::iterator& it, DirectiveContext context) {
 	std::map<std::string, DirectiveHandler>::iterator function = handlers.find(it->value);
 
 	if (function == handlers.end())
@@ -553,7 +563,7 @@ void	Config::getDirective(Server& server, std::vector<Token>::iterator& it, Dire
 	if (!(function->second.context & context))
 		throw ParseError("Directive '" + it->value + "' not allowed in this context", it->line, it->col, it->value);
 
-	(this->*(function->second.handler))(server, it); // cada função consome a linha toda e avança o iterator até o token ';' ou '}' no caso do location
+	(this->*(function->second.handler))(server, location_pointer, it); // cada função consome a linha toda e avança o iterator até o token ';' ou '}' no caso do location
 
 	if (function->second.kind == SIMPLE)
 		consumeSemiColon(it); // aqui vai uma função "expect" para consumir o token esperado ';' ou '}' no caso do location
@@ -577,7 +587,7 @@ std::vector<Token>::iterator	Config::getServerBlock(std::vector<Token>::iterator
 		if (start->type != DIRECTIVE)
 			throw ParseError("Syntax error", start->line, start->col, start->value);
 
-		getDirective(server, start, SERVER); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo
+		getDirective(server, NULL, start, SERVER); // location block vai ser consumido totalmente aqui dentro, sem perigo de "vazar" uma close brace pra condição abaixo e NULL = não estamos em location nenhum
 
 		if (start->type == SYMBOL && start->value == "}") {
 			++start;

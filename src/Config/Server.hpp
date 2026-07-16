@@ -1,6 +1,7 @@
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
+#include "Location.hpp"
 #include "../Utils/structs.hpp"
 
 class Server {
@@ -25,13 +26,11 @@ class Server {
 		void	setBodySize(long long size);
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
 		void	setIndexFiles(const std::vector<std::string>& index_pages);
-		void	setMethods(const std::vector<std::string>& methods);
 		void	setRedirect(const std::string& code, const std::string& url);
 		void	setCgi(const std::string& cgi_extension);
 		void	setCgiPath(const std::string& cgi_path);
 		void	setLocation(const Location& location);
 		void	setLocationPath(const std::string& path); // função para setar o path do location atual
-		void	unsetLocation(); // função para dessetar o ponteiro current_location do server, usada depois de terminar de ler um bloco location para evitar que diretivas fora do location setem dados no location por engano
 };
 
 #endif

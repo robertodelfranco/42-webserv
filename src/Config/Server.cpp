@@ -98,29 +98,6 @@ void	Server::setIndexFiles(const std::vector<std::string>& index_pages) {
 	target.insert(target.end(), index_pages.begin(), index_pages.end());
 }
 
-void	Server::setMethods(const std::vector<std::string>& methods) {
-	if (methods.empty())
-		throw std::runtime_error("Methods: at least one method is required");
-	
-	size_t allow_methods = 0;
-	for (size_t i = 0; i < methods.size(); ++i) {
-		std::string method = methods[i]; // create to upper function later
-		if (method == "GET")
-			allow_methods |= (1 << 0);
-		else if (method == "POST")
-			allow_methods |= (1 << 1);
-		else if (method == "DELETE")
-			allow_methods |= (1 << 2);
-		else
-			throw std::runtime_error("Methods: invalid method '" + methods[i] + "'");
-	}
-
-	if (this->current_location != NULL)
-		this->current_location->allow_methods = allow_methods;
-	else
-		throw std::runtime_error("Methods: methods directive is only allowed in location context");
-}
-
 void	Server::setRedirect(const std::string& code, const std::string& url) {
 	if (this->current_location == NULL)
 		throw std::runtime_error("Redirect: return directive is only allowed in location context");
@@ -153,8 +130,4 @@ void	Server::setLocationPath(const std::string& path) {
 		throw std::runtime_error("Location path: no location block to set path");
 	
 	this->current_location->path = path;
-}
-
-void	Server::unsetLocation() {
-	this->current_location = NULL; // desseta o ponteiro para evitar que diretivas fora do location setem dados no location por engano
 }
