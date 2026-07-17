@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>504 — Gateway Timeout</title>
+<style>
+  :root{
+    --bg: #08060c;
+    --bg-glow: #1a0f2e;
+    --purple: #9b5de5;
+    --purple-dim: #5a2d91;
+    --text: #ece9f2;
+    --muted: #6f6a80;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html, body{ height:100%; }
+
+  body{
+    background:
+      radial-gradient(circle at 50% 42%, var(--bg-glow) 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    overflow:hidden;
+    position:relative;
+  }
+
+  /* faint scanline / grid texture, kept quiet */
+  body::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(155,93,229,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(155,93,229,0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 70%);
+    pointer-events:none;
+  }
+
+  .panel{
+    position:relative;
+    text-align:left;
+    display:flex;
+    align-items:center;
+    gap: 2.2rem;
+    padding: 0 2rem;
+  }
+
+  .bar{
+    width:2px;
+    height:6.4rem;
+    background: linear-gradient(180deg, transparent, var(--purple), transparent);
+    box-shadow: 0 0 18px 1px var(--purple);
+    flex-shrink:0;
+    animation: pulse 3.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse{
+    0%, 100% { opacity:.55; }
+    50% { opacity:1; }
+  }
+
+  .content{
+    display:flex;
+    flex-direction:column;
+    gap:.55rem;
+  }
+
+  .eyebrow{
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size:.72rem;
+    letter-spacing:.32em;
+    text-transform:uppercase;
+    color: var(--purple);
+  }
+
+  .code{
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: clamp(3.5rem, 9vw, 6rem);
+    font-weight:700;
+    line-height:1;
+    letter-spacing:-.02em;
+    background: linear-gradient(135deg, #fff 0%, var(--purple) 120%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+
+  .title{
+    font-size:1.05rem;
+    font-weight:600;
+    color: var(--text);
+  }
+
+  .message{
+    font-size:.9rem;
+    color: var(--muted);
+    max-width:32ch;
+    line-height:1.5;
+  }
+
+  .footer{
+    margin-top:.4rem;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size:.68rem;
+    color: var(--purple-dim);
+    letter-spacing:.08em;
+  }
+
+  @media (max-width: 480px){
+    .panel{ gap:1.4rem; }
+    .bar{ height:5rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .bar{ animation:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="bar" aria-hidden="true"></div>
+    <div class="content">
+      <span class="eyebrow">Error</span>
+      <span class="code">504</span>
+      <span class="title">Gateway Timeout</span>
+      <p class="message">The upstream server took too long to respond.</p>
+      <span class="footer">webserv // 504</span>
+    </div>
+  </div>
+</body>
+</html>
