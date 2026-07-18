@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpParser.hpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: luide-ca <luide-ca@student.42.fr>          +#+  +:+       +#+        */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/25 16:26:00 by luide-ca          #+#    #+#             */
-/*   Updated: 2025/11/25 16:26:00 by luide-ca         ###   ########.fr       */
+/*   Updated: 2026/07/18 18:46:45 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,11 +21,13 @@
 class HttpParser
 {
     private:
-        // Stateless utility: never instantiated.
-        HttpParser();
-        HttpParser(const HttpParser &other);
-        HttpParser &operator=(const HttpParser &other);
-        ~HttpParser();
+        // ===== Raw data ===== 
+        /* esse _raw é o request bruto lido diretamente do fd do socket. o
+		método readFromFd() fica responsável por ir preenchendo. somente depois
+		que a leitura termina, o método parse() entra em ação para preencher
+		os campos do HttpRequest. só funciona porque o HttpParser recebe um
+		HttpRequest como ref& e pode editar os privados porque é "friend". */
+		std::string _raw;
 
         // ===== Internal helpers =====
         static bool isValidPath(const std::string &path);
@@ -43,7 +45,57 @@ class HttpParser
         static void setHTTPVersion(HttpRequest &req, const std::string &version);
 
     public:
-        // ===== Public API =====
+		// ===== Canonical form =====
+		HttpParser();
+		HttpParser(const HttpParser &other);
+		HttpParser &operator=(const HttpParser &other);
+		~HttpParser();
+
+		// ===== Public API =====
+		static void readFromFd(int fd, HttpRequest &req);
+		static void parse(HttpRequest &req);
+
+		// ===== Exceptions =====
+		class MethodException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
+
+		class PathException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
+
+		class HTTPVersionException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
+
+		class HeaderException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
+
+		class BodyException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
+
+		class ParseException : public std::exception {
+		public:
+			ParseException(const std::string &msg);
+			ParseException(const ParseException &other);
+			ParseException &operator=(const ParseException &other);
+			virtual ~ParseException() throw();
+			virtual const char *what() const throw();
+		private:
+			std::string _msg;
+		};
+
+
+
+
+	// ===== Public API =====
         static void readFromFd(int fd, HttpRequest &req);
         static void parse(HttpRequest &req);
 

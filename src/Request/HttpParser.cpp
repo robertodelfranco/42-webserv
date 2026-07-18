@@ -3,23 +3,24 @@
 /*                                                        :::      ::::::::   */
 /*   HttpParser.cpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: luide-ca <luide-ca@student.42.fr>          +#+  +:+       +#+        */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/25 16:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2025/11/25 16:26:36 by luide-ca         ###   ########.fr       */
+/*   Updated: 2026/07/18 20:38:33 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-
 /*
 
-    TODO: finish recv implementation
+    TODO:	finish recv implementation
+
+	TODO:	IDENTIFICAR EM QUAL PARTE DO CÓDIGO ESTAMOS REJEITANDO PIPELINING.
+			pipelining = client envia vários requests no mesmo raw sem esperar
+			resposta do servidor. daí o servidor segura cada request  
 
 */
 
-
 #include "HttpParser.hpp"
-
 #include <sstream>     
 #include <sys/types.h>
 #include <sys/socket.h> 
@@ -29,97 +30,50 @@
 #include <cstdlib>      
 
 // =======================
-// Exceptions
-// =======================
-
-const char *HttpParser::MethodException::what() const throw()
-{
-    return "HttpRequest: invalid HTTP method";
-}
-
-const char *HttpParser::PathException::what() const throw()
-{
-    return "HttpRequest: invalid request path";
-}
-
-const char *HttpParser::HTTPVersionException::what() const throw()
-{
-    return "HttpRequest: invalid HTTP version";
-}
-
-const char *HttpParser::HeaderException::what() const throw()
-{
-    return "HttpRequest: invalid header";
-}
-
-const char *HttpParser::BodyException::what() const throw()
-{
-    return "HttpRequest: invalid body length or malformed body";
-}
-
-// ParseException with message
-HttpParser::ParseException::ParseException(const std::string &msg)
-: _msg(msg)
-{}
-
-HttpParser::ParseException::ParseException(const ParseException &other)
-: std::exception(),
-  _msg(other._msg)
-{}
-
-HttpParser::ParseException &
-HttpParser::ParseException::operator=(const ParseException &other)
-{
-    if (this != &other)
-        _msg = other._msg;
-    return *this;
-}
-
-HttpParser::ParseException::~ParseException() throw()
-{}
-
-const char *HttpParser::ParseException::what() const throw()
-{
-    return _msg.c_str();
-}
-
-// =======================
 // Public API
 // =======================
 
 void HttpParser::readFromFd(int fd, HttpRequest &req)
 {
-    req._raw.clear();
+	/* vou deixar aqui só pra ser defensive, mas não teria outro motivo além
+	disso. o HTTP 1.0 não suporta pipelining, ou seja, não continua a ler
+	multiplo requests chegando pelo mesmo client. inclusive, se chegar mais
+	bytes além do esperado, acho que é o caso de rejeitar o request inteiro
+	e devolver um error de request mal formado. (edu) */
+	raw_.clear();
 
     char    buffer[4096];
     ssize_t n;
 
     while ((n = recv(fd, buffer, sizeof(buffer), 0)) > 0) {
-        req._raw.append(buffer, n);
+        raw_.append(buffer, n);
         if (n < (ssize_t)sizeof(buffer))
             break;
     }
 
-    if (req._raw.empty())
+    if (raw_.empty())
         throw ParseException("Empty HTTP request (no data read from socket)");
+
+	/* checar timeout, um request que não tem fim é um tipo de ataque. (edu) */
+
 }
 
 void HttpParser::parse(HttpRequest &req)
 {
-    std::string::size_type posRequestLineEnd = req._raw.find("\r\n");
+    std::string::size_type posRequestLineEnd = raw_.find("\r\n");
     if (posRequestLineEnd == std::string::npos)
         throw ParseException("Malformed HTTP request: missing CRLF after request line");
 
-    std::string::size_type posHeaderEnd = req._raw.find("\r\n\r\n");
+    std::string::size_type posHeaderEnd = raw_.find("\r\n\r\n");
     if (posHeaderEnd == std::string::npos)
         throw ParseException("Malformed HTTP request: missing empty line after headers");
 
-    std::string requestLine = req._raw.substr(0, posRequestLineEnd);
-    std::string headersBlock = req._raw.substr(
+    std::string requestLine = raw_.substr(0, posRequestLineEnd);
+    std::string headersBlock = raw_.substr(
         posRequestLineEnd + 2,
         posHeaderEnd - (posRequestLineEnd + 2)
     );
-    std::string body = req._raw.substr(posHeaderEnd + 4);
+    std::string body = raw_.substr(posHeaderEnd + 4);
 
     parseRequestLine(req, requestLine);
     parseHeadersBlock(req, headersBlock);
@@ -191,14 +145,14 @@ bool HttpParser::isValidChunkedBody(const std::string &body)
 bool HttpParser::isValidBody(const HttpRequest &req, const std::string &body)
 {
     std::map<std::string, std::string>::const_iterator itCL =
-        req._headers.find("content-length");
+        req.headers_.find("content-length");
     std::map<std::string, std::string>::const_iterator itTE =
-        req._headers.find("transfer-encoding");
+        req.headers_.find("transfer-encoding");
 
-    if (itCL != req._headers.end() && itTE != req._headers.end())
+    if (itCL != req.headers_.end() && itTE != req.headers_.end())
         return (false);
 
-    if (itCL != req._headers.end())
+    if (itCL != req.headers_.end())
     {
         char *end;
         long contentLen = std::strtol(itCL->second.c_str(), &end, 10);
@@ -212,7 +166,7 @@ bool HttpParser::isValidBody(const HttpRequest &req, const std::string &body)
         return (true);
     }
 
-    if (itTE != req._headers.end())
+    if (itTE != req.headers_.end())
     {
         if (itTE->second != "chunked")
             return (false);
@@ -223,7 +177,7 @@ bool HttpParser::isValidBody(const HttpRequest &req, const std::string &body)
         return (true);
     }
 
-    if (req._method == "GET")
+    if (req.method_ == "GET")
         return (true);
 
     if (!body.empty())
@@ -274,7 +228,7 @@ void HttpParser::parseHeadersBlock(HttpRequest &req, const std::string &block)
         while (!value.empty() && (value[0] == ' ' || value[0] == '\t'))
             value.erase(0, 1);
 
-        req._headers[toLower(key)] = value;
+        req.headers_[toLower(key)] = value;
     }
 }
 
@@ -282,28 +236,28 @@ void HttpParser::parseBody(HttpRequest &req, const std::string &body)
 {
     if (!isValidBody(req, body))
         throw BodyException();
-    req._body = body;
+    req.body_ = body;
 }
 
 void HttpParser::setMethod(HttpRequest &req, const std::string &method)
 {
     if (method != "GET" && method != "POST" && method != "DELETE")
         throw MethodException();
-    req._method = method;
+    req.method_ = method;
 }
 
 void HttpParser::setPath(HttpRequest &req, const std::string &path)
 {
     if (!isValidPath(path))
         throw PathException();
-    req._path = path;
+    req.path_ = path;
 }
 
 void HttpParser::setHTTPVersion(HttpRequest &req, const std::string &version)
 {
     if (version != "HTTP/1.0" && version != "HTTP/1.1")
         throw HTTPVersionException();
-    req._httpVersion = version;
+    req.httpVersion_ = version;
 }
 
 std::string toLower(const std::string &s)
@@ -314,4 +268,61 @@ std::string toLower(const std::string &s)
         out[i] = static_cast<char>(std::tolower(c));
     }
     return out;
+}
+
+/* coloquei as exception no fim (edu) */
+
+// =======================
+// Exceptions
+// =======================
+
+const char *HttpParser::MethodException::what() const throw()
+{
+    return "HttpRequest: invalid HTTP method";
+}
+
+const char *HttpParser::PathException::what() const throw()
+{
+    return "HttpRequest: invalid request path";
+}
+
+const char *HttpParser::HTTPVersionException::what() const throw()
+{
+    return "HttpRequest: invalid HTTP version";
+}
+
+const char *HttpParser::HeaderException::what() const throw()
+{
+    return "HttpRequest: invalid header";
+}
+
+const char *HttpParser::BodyException::what() const throw()
+{
+    return "HttpRequest: invalid body length or malformed body";
+}
+
+// ParseException with message
+HttpParser::ParseException::ParseException(const std::string &msg)
+: _msg(msg)
+{}
+
+HttpParser::ParseException::ParseException(const ParseException &other)
+: std::exception(),
+  _msg(other._msg)
+{}
+
+HttpParser::ParseException &
+HttpParser::ParseException::operator=(const ParseException &other)
+{
+    if (this != &other)
+        _msg = other._msg;
+    return *this;
+}
+
+HttpParser::ParseException::~ParseException() throw()
+{}
+
+const char *HttpParser::ParseException::what() const throw()
+{
+    return _msg.c_str();
 }

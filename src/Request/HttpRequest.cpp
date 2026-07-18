@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpRequest.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: luide-ca <luide-ca@student.42.fr>          +#+  +:+       +#+        */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/24 17:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2025/11/25 16:24:33 by luide-ca         ###   ########.fr       */
+/*   Updated: 2026/07/18 20:37:36 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,37 +16,41 @@
 // Canonical form
 // =======================
 
+/* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest::HttpRequest()
 : _raw(),
-  _method(),
-  _path(),
-  _httpVersion(),
-  _headers(),
-  _body()
+  method_(),
+  path_(),
+  httpVersion_(),
+  headers_(),
+  body_()
 {}
 
+/* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest::HttpRequest(const HttpRequest &other)
 : _raw(other._raw),
-  _method(other._method),
-  _path(other._path),
-  _httpVersion(other._httpVersion),
-  _headers(other._headers),
-  _body(other._body)
+  method_(other.method_),
+  path_(other.path_),
+  httpVersion_(other.httpVersion_),
+  headers_(other.headers_),
+  body_(other.body_)
 {}
 
+/* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest &HttpRequest::operator=(const HttpRequest &other)
 {
     if (this != &other) {
         _raw         = other._raw;
-        _method      = other._method;
-        _path        = other._path;
-        _httpVersion = other._httpVersion;
-        _headers     = other._headers;
-        _body        = other._body;
+        method_      = other.method_;
+        path_        = other.path_;
+        httpVersion_ = other.httpVersion_;
+        headers_     = other.headers_;
+        body_        = other.body_;
     }
     return *this;
 }
 
+/* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest::~HttpRequest()
 {}
 
@@ -61,33 +65,33 @@ const std::string &HttpRequest::getRaw() const
 
 const std::string &HttpRequest::getMethod() const
 {
-    return _method;
+    return method_;
 }
 
 const std::string &HttpRequest::getPath() const
 {
-    return _path;
+    return path_;
 }
 
 const std::string &HttpRequest::getHTTPVersion() const
 {
-    return _httpVersion;
+    return httpVersion_;
 }
 
 const std::map<std::string, std::string> &HttpRequest::getHeaders() const
 {
-    return _headers;
+    return headers_;
 }
 
 std::string HttpRequest::getHeader(const std::string &key) const
 {
-    std::map<std::string, std::string>::const_iterator it = _headers.find(key);
-    if (it == _headers.end())
+    std::map<std::string, std::string>::const_iterator it = headers_.find(key);
+    if (it == headers_.end())
         return std::string();
     return it->second;
 }
 
 const std::string &HttpRequest::getBody() const
 {
-    return _body;
+    return body_;
 }
