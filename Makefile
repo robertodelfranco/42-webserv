@@ -9,7 +9,11 @@ SRCS	=	main.cpp \
 			Config/Location.cpp \
 			Config/Listen.cpp \
 			Config/Token.cpp \
-			Utils/Utils.cpp
+			Utils/Utils.cpp \
+			Network/FileDescriptor.cpp \
+			Network/Socket.cpp \
+			Network/Connection.cpp \
+			Network/EventLoop.cpp
 
 
 MAGENTA	=	\033[1;95m
