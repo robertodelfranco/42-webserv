@@ -1,8 +1,11 @@
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
+#include <string>
+#include <vector>
+#include <map>
+#include "Listen.hpp"
 #include "Location.hpp"
-#include "../Utils/structs.hpp"
 
 class Server {
 	private:
@@ -13,7 +16,6 @@ class Server {
 		std::map<int, std::string>		error_page; // páginas de erros definidas no config
 		std::vector<Location>			locations; // cada bloco location dentro de server
 		long long						client_max_body_size; // content-length máximo do body da request
-		Location*						current_location; // ponteiro para o location block atual, usado para setar as diretivas de location
 
 	public:
 		Server();
@@ -26,11 +28,14 @@ class Server {
 		void	setBodySize(long long size);
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
 		void	setIndexFiles(const std::vector<std::string>& index_pages);
-		void	setRedirect(const std::string& code, const std::string& url);
-		void	setCgi(const std::string& cgi_extension);
-		void	setCgiPath(const std::string& cgi_path);
-		void	setLocation(const Location& location);
-		void	setLocationPath(const std::string& path); // função para setar o path do location atual
+		void	addLocation(const Location& location); // adiciona um location já completo no vetor de locations
+
+		const std::string&					getRoot() const;
+		const std::vector<Listen>&			getListens() const;
+		const std::vector<std::string>&	getIndexFiles() const;
+		const std::map<int, std::string>&	getErrorPages() const;
+		const std::vector<Location>&		getLocations() const;
+		long long							getBodySize() const;
 };
 
 #endif

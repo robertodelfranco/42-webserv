@@ -1,4 +1,12 @@
 #include "Config/Config.hpp"
+#include "Utils/Color.hpp"
+#include <iostream>
+#include <cstring>
+#include <cstdlib>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 int main(int ac, char **av)
 {
@@ -66,13 +74,13 @@ int main(int ac, char **av)
         ssize_t n = read(conn_fd, buffer, sizeof(buffer) - 1);
         if (n > 0) {
             if (strncmp("DELETE", buffer, 6) == 0)
-                std::cout << RED << "METHOD DELETE CALLED!" << RESET << std::endl;
+                std::cout << Color::RED << "METHOD DELETE CALLED!" << Color::RESET << std::endl;
             else if (strncmp("POST", buffer, 4) == 0)
-                std::cout << CYAN << "METHOD POST CALLED!" << RESET << std::endl;
+                std::cout << Color::CYAN << "METHOD POST CALLED!" << Color::RESET << std::endl;
             else if (strncmp("GET", buffer, 3) == 0)
-                std::cout << GREEN << "METHOD GET CALLED!" << RESET << std::endl;
+                std::cout << Color::GREEN << "METHOD GET CALLED!" << Color::RESET << std::endl;
             else {
-                std::cout << YELLOW << "METHOD NOT FOUND" << RESET << std::endl;
+                std::cout << Color::YELLOW << "METHOD NOT FOUND" << Color::RESET << std::endl;
                 close(conn_fd);
                 continue ;
             }

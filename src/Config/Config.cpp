@@ -1,4 +1,11 @@
 #include "Config.hpp"
+#include "../Utils/Color.hpp"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <cctype>
+#include <cstdlib>
+#include <limits>
 
 Config::Config() : servers(), tokens(), handlers() {
 	handlers[std::string("listen")] = (DirectiveHandler){&Config::getListen, SERVER, SIMPLE};
@@ -16,12 +23,16 @@ Config::Config() : servers(), tokens(), handlers() {
 
 Config::~Config() {}
 
+const std::vector<Server>&	Config::getServers() const {
+	return servers;
+}
+
 Config::ParseError::ParseError(const std::string& msg, size_t line, size_t col, const std::string& snippet) {
 	std::ostringstream	os;
 
 	os << "Parse error: " << msg << " (line: " << line << " col: " << (col == 0 ? col : col - 1) << ")";
 	if (!snippet.empty())
-		os << "\n" << snippet << "\n" << RED << std::string((col == 0 ? col : col - 1), ' ') << '^' << RESET;
+		os << "\n" << snippet << "\n" << Color::RED << std::string((col == 0 ? col : col - 1), ' ') << '^' << Color::RESET;
 
 	m_message = os.str();
 };
@@ -255,7 +266,7 @@ void	Config::initLexer(const char *file) {
 		}
 		Utils::ref_trim(line);
 		if (line.length() > 0) {
-			std::cout << YELLOW << line << " |" << RESET << std::endl;
+			std::cout << Color::YELLOW << line << " |" << Color::RESET << std::endl;
 			consumeLine(line, count_lines);
 		}
 		++count_lines;
@@ -265,7 +276,7 @@ void	Config::initLexer(const char *file) {
 
 	std::cout << std::endl;
 	for (std::vector<Token>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
-		std::cout << GREEN << it->type << " -- " << it->value << "\n" << it->line << " -- " << it->col << RESET << std::endl;
+		std::cout << Color::GREEN << it->type << " -- " << it->value << "\n" << it->line << " -- " << it->col << Color::RESET << std::endl;
 		std::cout << std::endl;
 	}
 
@@ -302,7 +313,6 @@ void	Config::getServerName(Server& server, Location* location_pointer, std::vect
 }
 
 void	Config::getBodySize(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid body size argument", it->line, it->col, it->value);
@@ -342,24 +352,29 @@ void	Config::getBodySize(Server& server, Location* location_pointer, std::vector
     if (size > max_size)
         throw ParseError("Body size is too large", it->line, it->col, it->value);
 
-    server.setBodySize(size * multiplier);
+    if (location_pointer != NULL) {
+        location_pointer->setBodySize(size * multiplier);
+    } else {
+        server.setBodySize(size * multiplier);
+    }
 
 	++it;
 }
 
 void	Config::getRoot(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer;
 	++it;
 	if (it->type != PATH)
 		throw ParseError("Invalid root argument", it->line, it->col, it->value);
 
-	server.setRoot(it->value);
+	if (location_pointer != NULL)
+		location_pointer->setRoot(it->value);
+	else
+		server.setRoot(it->value);
 
 	++it;
 }
 
 void	Config::getIndexPage(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid index page argument", it->line, it->col, it->value);
@@ -374,11 +389,13 @@ void	Config::getIndexPage(Server& server, Location* location_pointer, std::vecto
 		++it;
 	}
 
-	server.setIndexFiles(index_files);
+	if (location_pointer != NULL)
+		location_pointer->setIndexFiles(index_files);
+	else
+		server.setIndexFiles(index_files);
 }
 
 void	Config::getErrorPages(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer;
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid error pages argument", it->line, it->col, it->value);
@@ -411,7 +428,10 @@ void	Config::getErrorPages(Server& server, Location* location_pointer, std::vect
 	if (it->type != PATH)
 		throw ParseError("Invalid error page path argument", it->line, it->col, it->value);
 
-	server.setErrorPages(error_pages, it->value);
+	if (location_pointer != NULL)
+		location_pointer->setErrorPages(error_pages, it->value);
+	else
+		server.setErrorPages(error_pages, it->value);
 
 	++it;
 }
@@ -437,7 +457,7 @@ void	Config::getMethods(Server& server, Location* location_pointer, std::vector<
 }
 
 void	Config::getRedirect(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer;
+	(void)server; // return é location-only, contexto já garante location_pointer != NULL
 	++it;
 	if (it->type != STRING)
 		throw ParseError("Invalid redirect code argument", it->line, it->col, it->value);
@@ -468,12 +488,12 @@ void	Config::getRedirect(Server& server, Location* location_pointer, std::vector
 	if (redirect_url.empty())
 		throw ParseError("Empty redirect URL value", it->line, it->col, it->value);
 	
-	server.setRedirect(value, redirect_url);
+	location_pointer->setRedirect(value, redirect_url);
 	++it;
 }
 
 void	Config::getCgi(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer;
+	(void)server; // cgi_type é location-only, contexto já garante location_pointer != NULL
 	++it;
 	if (it->type != PATH)
 		throw ParseError("Invalid CGI type argument", it->line, it->col, it->value);
@@ -486,12 +506,12 @@ void	Config::getCgi(Server& server, Location* location_pointer, std::vector<Toke
 	if (cgi_extension != ".py" && cgi_extension != ".php")
 		throw ParseError("Unsupported CGI type '" + cgi_extension + "'", it->line, it->col, it->value);
 	
-	server.setCgi(cgi_extension);
+	location_pointer->setCgi(cgi_extension);
 	++it;
 }
 
 void	Config::getCgiPath(Server& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer;
+	(void)server; // cgi_path é location-only, contexto já garante location_pointer != NULL
 	++it;
 	if (it->type != PATH)
 		throw ParseError("Invalid CGI path argument", it->line, it->col, it->value);
@@ -501,7 +521,7 @@ void	Config::getCgiPath(Server& server, Location* location_pointer, std::vector<
 	if (cgi_path.empty())
 		throw ParseError("Empty CGI path value", it->line, it->col, it->value);
 	
-	server.setCgiPath(cgi_path);
+	location_pointer->setCgiPath(cgi_path);
 	++it;
 }
 

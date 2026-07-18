@@ -1,13 +1,17 @@
 #include "Server.hpp"
+#include <stdexcept>
+#include <utility>
+#include <cctype>
+#include <cstdlib>
+#include <sys/stat.h>
+#include <unistd.h>
 
-Server::Server() : client_max_body_size(0), current_location(NULL) {}
+Server::Server() : client_max_body_size(0) {}
 
 Server::Server(const Server& other)
 	: root(other.root), listens(other.listens), index_files(other.index_files),
-	error_page(other.error_page), locations(other.locations), 
-	client_max_body_size(other.client_max_body_size), current_location(other.current_location) {
-		current_location = NULL; // o current_location é um ponteiro para um location dentro do vetor de locations do server, então quando eu copio o server eu preciso setar o current_location do novo server para NULL para evitar que ele aponte para um location do server original, e depois quando eu for setar o location no novo server eu vou setar o current_location para o location certo
-	}
+	error_page(other.error_page), locations(other.locations),
+	client_max_body_size(other.client_max_body_size) {}
 
 Server& Server::operator=(const Server& other) {
 	if (this != &other) {
@@ -17,7 +21,6 @@ Server& Server::operator=(const Server& other) {
 		error_page = other.error_page;
 		locations = other.locations;
 		client_max_body_size = other.client_max_body_size;
-		current_location = NULL;
 	}
 	return *this;
 }
@@ -90,44 +93,33 @@ void	Server::setIndexFiles(const std::vector<std::string>& index_pages) {
 	if (index_pages.empty())
 		throw std::runtime_error("Index: at least one index file is required");
 
-	// eu criei um ponteiro para o vetor de index_files do server ou location dependendo do contexto, para evitar if else e código duplicado, depois eu insiro nesse ponteiro que aponta pra variavel do contexto e preencho ela
-	std::vector<std::string>& target = (this->current_location == NULL)
-		? this->index_files 
-		: this->current_location->index_files;
-
-	target.insert(target.end(), index_pages.begin(), index_pages.end());
+	this->index_files.insert(this->index_files.end(), index_pages.begin(), index_pages.end());
 }
 
-void	Server::setRedirect(const std::string& code, const std::string& url) {
-	if (this->current_location == NULL)
-		throw std::runtime_error("Redirect: return directive is only allowed in location context");
-	
-	this->current_location->redir.insert(std::make_pair(code, url));	
-	
+void	Server::addLocation(const Location& location) {
+	this->locations.push_back(location); // location já chega completo, montado localmente em getLocationBlock
 }
 
-void	Server::setCgi(const std::string& cgi_extension) {
-	if (this->current_location == NULL)
-		throw std::runtime_error("CGI: cgi_type directive is only allowed in location context");
-	
-	this->current_location->cgi_type = cgi_extension;
+const std::string&	Server::getRoot() const {
+	return this->root;
 }
 
-void	Server::setCgiPath(const std::string& cgi_path) {
-	if (this->current_location == NULL)
-		throw std::runtime_error("CGI path: cgi_path directive is only allowed in location context");
-	
-	this->current_location->cgi_path = cgi_path;
+const std::vector<Listen>&	Server::getListens() const {
+	return this->listens;
 }
 
-void	Server::setLocation(const Location& location) {
-	this->locations.push_back(location); // adiciona o location no vetor de locations do server
-	this->current_location = &this->locations.back(); // seta o ponteiro current_location para o location que acabou de ser adicionado no vetor, para as próximas diretivas de location setarem os dados nesse location
+const std::vector<std::string>&	Server::getIndexFiles() const {
+	return this->index_files;
 }
 
-void	Server::setLocationPath(const std::string& path) {
-	if (this->current_location == NULL)
-		throw std::runtime_error("Location path: no location block to set path");
-	
-	this->current_location->path = path;
+const std::map<int, std::string>&	Server::getErrorPages() const {
+	return this->error_page;
+}
+
+const std::vector<Location>&	Server::getLocations() const {
+	return this->locations;
+}
+
+long long	Server::getBodySize() const {
+	return this->client_max_body_size;
 }

@@ -1,8 +1,20 @@
 #ifndef CONFIG_HPP
 # define CONFIG_HPP
 
+#include <exception>
 #include "../Utils/Utils.hpp"
+#include "Token.hpp"
 #include "Server.hpp"
+
+enum DirectiveKind {
+	SIMPLE,
+	BLOCK
+};
+
+enum DirectiveContext {
+	SERVER = 1, // 1 << 0
+	LOCATION = 2 // 1 << 1
+};
 
 class Config;
 typedef void (Config::*TokenHandler)(Server&, Location*, std::vector<Token>::iterator&); // protótipo para declarar array de funções
@@ -60,6 +72,8 @@ class Config {
 
 		void	initLexer(const char *file);
 		void	initParser();
+
+		const std::vector<Server>&	getServers() const;
 };
 
 #endif
