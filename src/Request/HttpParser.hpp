@@ -1,71 +1,51 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   HTTPRequest.hpp                                    :+:      :+:    :+:   */
+/*   HttpParser.hpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: luide-ca <luide-ca@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/11/24 17:26:00 by luide-ca          #+#    #+#             */
-/*   Updated: 2025/11/25 16:25:21 by luide-ca         ###   ########.fr       */
+/*   Created: 2025/11/25 16:26:00 by luide-ca          #+#    #+#             */
+/*   Updated: 2025/11/25 16:26:00 by luide-ca         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef HTTP_REQUEST_HPP
-# define HTTP_REQUEST_HPP
+#ifndef HTTP_PARSER_HPP
+# define HTTP_PARSER_HPP
 
 # include <string>
-# include <map>
 # include <exception>
 
-class HTTPRequest
+# include "HttpRequest.hpp"
+
+class HttpParser
 {
     private:
-        // ===== Raw data =====
-        std::string _raw;
-
-        // ===== Request line =====
-        std::string _method;
-        std::string _path;
-        std::string _httpVersion;
-
-        // ===== Headers + body =====
-        std::map<std::string, std::string> _headers;
-        std::string                        _body;
+        // Stateless utility: never instantiated.
+        HttpParser();
+        HttpParser(const HttpParser &other);
+        HttpParser &operator=(const HttpParser &other);
+        ~HttpParser();
 
         // ===== Internal helpers =====
-        bool isValidPath(const std::string &path) const;
-        
-        bool isValidChunkedBody(const std::string &body) const;
-        bool isValidBody(const std::string &body) const;
+        static bool isValidPath(const std::string &path);
+
+        static bool isValidChunkedBody(const std::string &body);
+        static bool isValidBody(const HttpRequest &req, const std::string &body);
 
         // ===== Internal Parsers =====
-        void parseRequestLine(const std::string &line);
-        void parseHeadersBlock(const std::string &block);
-        void parseBody(const std::string &body);
+        static void parseRequestLine(HttpRequest &req, const std::string &line);
+        static void parseHeadersBlock(HttpRequest &req, const std::string &block);
+        static void parseBody(HttpRequest &req, const std::string &body);
 
-        void setMethod(const std::string &method);
-        void setPath(const std::string &path);
-        void setHTTPVersion(const std::string &version);
+        static void setMethod(HttpRequest &req, const std::string &method);
+        static void setPath(HttpRequest &req, const std::string &path);
+        static void setHTTPVersion(HttpRequest &req, const std::string &version);
 
     public:
-        // ===== Canonical form =====
-        HTTPRequest();
-        explicit HTTPRequest(int fd);
-        HTTPRequest(const HTTPRequest &other);
-        HTTPRequest &operator=(const HTTPRequest &other);
-        ~HTTPRequest();
-
         // ===== Public API =====
-        void        readFromFd(int fd);   
-        void        parse();                      
-
-        const std::string &getRaw() const;
-        const std::string &getMethod() const;
-        const std::string &getPath() const;
-        const std::string &getHTTPVersion() const;
-        const std::map<std::string, std::string> &getHeaders() const;
-        std::string        getHeader(const std::string &key) const;
-        const std::string &getBody() const;
+        static void readFromFd(int fd, HttpRequest &req);
+        static void parse(HttpRequest &req);
 
         // ===== Exceptions =====
         class MethodException : public std::exception {
