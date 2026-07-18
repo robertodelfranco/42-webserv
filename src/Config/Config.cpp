@@ -266,7 +266,7 @@ void	Config::initLexer(const char *file) {
 		}
 		Utils::ref_trim(line);
 		if (line.length() > 0) {
-			std::cout << Color::YELLOW << line << " |" << Color::RESET << std::endl;
+			// std::cout << Color::YELLOW << line << " |" << Color::RESET << std::endl;
 			consumeLine(line, count_lines);
 		}
 		++count_lines;
@@ -274,11 +274,12 @@ void	Config::initLexer(const char *file) {
 	tokens.push_back(Token(END_OF_STREAM, "EOF", count_lines, 0));
 	config_file.close();
 
-	std::cout << std::endl;
-	for (std::vector<Token>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
-		std::cout << Color::GREEN << it->type << " -- " << it->value << "\n" << it->line << " -- " << it->col << Color::RESET << std::endl;
-		std::cout << std::endl;
-	}
+	// confirm tokenization index
+	// std::cout << std::endl;
+	// for (std::vector<Token>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
+	// 	std::cout << Color::GREEN << it->type << " -- " << it->value << "\n" << it->line << " -- " << it->col << Color::RESET << std::endl;
+	// 	std::cout << std::endl;
+	// }
 
 	initParser();
 }
