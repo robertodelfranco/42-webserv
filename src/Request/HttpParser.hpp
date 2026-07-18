@@ -6,12 +6,12 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/25 16:26:00 by luide-ca          #+#    #+#             */
-/*   Updated: 2026/07/18 18:46:45 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/07/18 20:54:05 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef HTTP_PARSER_HPP
-# define HTTP_PARSER_HPP
+#ifndef HTTPPARSER_HPP
+# define HTTPPARSER_HPP
 
 # include <string>
 # include <exception>

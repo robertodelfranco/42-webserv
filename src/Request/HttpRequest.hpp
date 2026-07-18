@@ -6,12 +6,12 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/24 17:26:00 by eduribei          #+#    #+#             */
-/*   Updated: 2026/07/18 18:40:59 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/07/18 20:53:59 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef HTTP_REQUEST_HPP
-# define HTTP_REQUEST_HPP
+#ifndef HTTPREQUEST_HPP
+# define HTTPREQUEST_HPP
 
 # include <string>
 # include <map>
