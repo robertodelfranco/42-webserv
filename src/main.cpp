@@ -4,20 +4,21 @@
 
 int main(int ac, char **av)
 {
-    if (ac > 2) {
-        std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
-        return 1;
-    }
+	if (ac > 2) {
+		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
+		return 1;
+	}
 
-    Config config;
-    try {
-        config.load(av[1]);
-        config.getServers(); // just to test if it works, we don't do anything with the result
-    }
-    catch (const std::exception& e) {
-        std::cout << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
+	Config config;
+	try {
+		config.load(av[1]);
+		// EventLoop loop(config.getServers());
+		// loop.run();
+	}
+	catch (const std::exception& e) {
+		std::cout << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
 
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }

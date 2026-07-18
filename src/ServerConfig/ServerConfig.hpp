@@ -7,10 +7,10 @@
 #include "Listen.hpp"
 #include "Location.hpp"
 
-// Dados de UM bloco server{} do arquivo de config -- não é "o servidor
+// Dados de UM bloco server{} do arquivo de config, não é "o servidor
 // rodando" (isso é EventLoop/Socket/Connection, em Network/), é só o
 // resultado parseado que essas classes vão consultar pra saber root,
-// listens, locations etc. de cada request.
+// listens, locations e de cada request.
 class ServerConfig {
 	private:
 		std::string						root; // caminho root definido
