@@ -56,7 +56,7 @@ void	Location::setMethods(const std::vector<std::string>& methods) {
 
 	size_t allow_methods = 0;
 	for (size_t i = 0; i < methods.size(); ++i) {
-		std::string method = methods[i]; // create to upper function later
+		std::string method = methods[i]; // create 'to upper' function later
 		if (method == "GET")
 			allow_methods |= GET;
 		else if (method == "POST")

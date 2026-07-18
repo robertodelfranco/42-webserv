@@ -1,4 +1,4 @@
-#include "Server.hpp"
+#include "ServerConfig.hpp"
 #include <stdexcept>
 #include <utility>
 #include <cctype>
@@ -6,14 +6,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-Server::Server() : client_max_body_size(0) {}
+ServerConfig::ServerConfig() : client_max_body_size(0) {}
 
-Server::Server(const Server& other)
+ServerConfig::ServerConfig(const ServerConfig& other)
 	: root(other.root), listens(other.listens), index_files(other.index_files),
 	error_page(other.error_page), locations(other.locations),
 	client_max_body_size(other.client_max_body_size) {}
 
-Server& Server::operator=(const Server& other) {
+ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
 	if (this != &other) {
 		root = other.root;
 		listens = other.listens;
@@ -25,9 +25,9 @@ Server& Server::operator=(const Server& other) {
 	return *this;
 }
 
-Server::~Server() {}
+ServerConfig::~ServerConfig() {}
 
-void	Server::setListen(const std::string& host, const std::string& port) {
+void	ServerConfig::setListen(const std::string& host, const std::string& port) {
 	if (port.empty())
 		throw std::runtime_error("Listen: port is required");
 
@@ -51,12 +51,12 @@ void	Server::setListen(const std::string& host, const std::string& port) {
 	listens.push_back(Listen(resolved_host, port_num));
 }
 
-void	Server::setRoot(const std::string& root) {
+void	ServerConfig::setRoot(const std::string& root) {
 	if (root.empty())
 		throw std::runtime_error("Root: path is required");
 	if (root[0] != '/' && root[0] != '.')
 		throw std::runtime_error("Root: path must be absolute or relative to config file '" + root + "'");
-	
+
 	struct stat info;
 	if (stat(root.c_str(), &info) != 0)
 		throw std::runtime_error("Root: path does not exist '" + root + "'");
@@ -68,58 +68,58 @@ void	Server::setRoot(const std::string& root) {
 	this->root = root;
 }
 
-void	Server::setBodySize(long long size) {
+void	ServerConfig::setBodySize(long long size) {
 	if (size < 0)
 		throw std::runtime_error("Body size cannot be negative");
 	this->client_max_body_size = size;
 }
 
-void	Server::setErrorPages(const std::vector<int>& error_pages, const std::string& path) {
+void	ServerConfig::setErrorPages(const std::vector<int>& error_pages, const std::string& path) {
 	if (error_pages.empty())
 		throw std::runtime_error("Error page: at least one error code is required");
 
 	if (path.empty())
 		throw std::runtime_error("Error page: path is required");
-	
+
 	if (path[0] != '/' && path[0] != '.')
 		throw std::runtime_error("Error page: path must be absolute or relative to config file '" + path + "'");
-	
+
 	for (size_t i = 0; i < error_pages.size(); ++i) {
 		this->error_page.insert(std::make_pair(error_pages[i], path));
 	}
 }
 
-void	Server::setIndexFiles(const std::vector<std::string>& index_pages) {
+void	ServerConfig::setIndexFiles(const std::vector<std::string>& index_pages) {
 	if (index_pages.empty())
 		throw std::runtime_error("Index: at least one index file is required");
 
 	this->index_files.insert(this->index_files.end(), index_pages.begin(), index_pages.end());
 }
 
-void	Server::addLocation(const Location& location) {
+void	ServerConfig::addLocation(const Location& location) {
 	this->locations.push_back(location); // location já chega completo, montado localmente em getLocationBlock
 }
 
-const std::string&	Server::getRoot() const {
+const std::string&	ServerConfig::getRoot() const {
 	return this->root;
 }
 
-const std::vector<Listen>&	Server::getListens() const {
+const std::vector<Listen>&	ServerConfig::getListens() const {
 	return this->listens;
 }
 
-const std::vector<std::string>&	Server::getIndexFiles() const {
+const std::vector<std::string>&	ServerConfig::getIndexFiles() const {
 	return this->index_files;
 }
 
-const std::map<int, std::string>&	Server::getErrorPages() const {
+const std::map<int, std::string>&	ServerConfig::getErrorPages() const {
 	return this->error_page;
 }
 
-const std::vector<Location>&	Server::getLocations() const {
+const std::vector<Location>&	ServerConfig::getLocations() const {
 	return this->locations;
 }
 
-long long	Server::getBodySize() const {
+long long	ServerConfig::getBodySize() const {
 	return this->client_max_body_size;
 }

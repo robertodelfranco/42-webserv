@@ -11,7 +11,8 @@ int main(int ac, char **av)
 
     Config config;
     try {
-        config.initLexer(av[1]);
+        config.load(av[1]);
+        config.getServers(); // just to test if it works, we don't do anything with the result
     }
     catch (const std::exception& e) {
         std::cout << e.what() << std::endl;

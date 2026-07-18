@@ -1,5 +1,5 @@
-#ifndef SERVER_HPP
-# define SERVER_HPP
+#ifndef SERVERCONFIG_HPP
+# define SERVERCONFIG_HPP
 
 #include <string>
 #include <vector>
@@ -7,7 +7,11 @@
 #include "Listen.hpp"
 #include "Location.hpp"
 
-class Server {
+// Dados de UM bloco server{} do arquivo de config -- não é "o servidor
+// rodando" (isso é EventLoop/Socket/Connection, em Network/), é só o
+// resultado parseado que essas classes vão consultar pra saber root,
+// listens, locations etc. de cada request.
+class ServerConfig {
 	private:
 		std::string						root; // caminho root definido
 		std::vector<Listen>				listens; // portas abertas
@@ -18,10 +22,10 @@ class Server {
 		long long						client_max_body_size; // content-length máximo do body da request
 
 	public:
-		Server();
-		Server(const Server& other);
-		Server& operator=(const Server& other);
-		~Server();
+		ServerConfig();
+		ServerConfig(const ServerConfig& other);
+		ServerConfig& operator=(const ServerConfig& other);
+		~ServerConfig();
 
 		void	setListen(const std::string& host, const std::string& port);
 		void	setRoot(const std::string& root);
