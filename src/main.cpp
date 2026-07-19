@@ -2,6 +2,13 @@
 #include <iostream>
 #include <cstdlib>
 
+static const char*	resolveConfigPath(int ac, char **av)
+{
+	if (ac == 2)
+		return av[1];
+	return "config/default.conf"; // enunciado: cai pra um caminho default se não vier argumento
+}
+
 int main(int ac, char **av)
 {
 	if (ac > 2) {
@@ -11,7 +18,7 @@ int main(int ac, char **av)
 
 	Config config;
 	try {
-		config.load(av[1]);
+		config.load(resolveConfigPath(ac, av));
 		// EventLoop loop(config.getServers());
 		// loop.run();
 	}
