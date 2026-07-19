@@ -8,6 +8,8 @@ class FileDescriptor {
 	private:
 		int	_fd;
 
+		/* muito importante isso aqui! copiar fd num wrapper desse vai dar
+		problema. quando é necessário, fd se copia com dup(), dup2(). (edu) */
 		FileDescriptor(const FileDescriptor& other);
 		FileDescriptor& operator=(const FileDescriptor& other);
 

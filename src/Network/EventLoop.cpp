@@ -3,8 +3,15 @@
 // Copia os Server parseados (não deveriam mudar depois disso) e já abre
 // os sockets ouvintes -- depois do construtor, o EventLoop está pronto
 // pra rodar run().
+
+/*	style guide google: "if the signature and initializer list are not
+	all on one line, you must wrap before the colon and indent 4 spaces."
+	sim, sou fresco rs... fica muito feio tudo numa linha. (edu) */
 EventLoop::EventLoop(const std::vector<Server>& servers)
-: _servers(servers), _listeners(), _listenerCandidates(), _connections() {
+	: _servers(servers),
+	  _listeners(),
+	  _listenerCandidates(),
+	  _connections() {
 	openListeners();
 }
 
@@ -14,7 +21,8 @@ EventLoop::~EventLoop() {
 	for (size_t i = 0; i < _listeners.size(); ++i)
 		delete _listeners[i];
 
-	for (std::map<int, Connection*>::iterator it = _connections.begin(); it != _connections.end(); ++it)
+	for (std::map<int, Connection*>::iterator it = _connections.begin();
+		it != _connections.end(); ++it)
 		delete it->second;
 }
 
