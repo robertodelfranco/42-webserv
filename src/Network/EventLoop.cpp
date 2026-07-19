@@ -29,6 +29,13 @@ EventLoop::~EventLoop() {
 void	EventLoop::openListeners() {
 	// TODO: implementar o agrupamento + abertura dos sockets.
 	//
+	
+	/*	O subject diz explicitamente que virtual hosting não é obrigatório.
+		precisa avaliar se vale a pena a implementação. Na página 9:
+		"We deliberately chose to offer only a subset of the HTTP RFC.
+		In this context, the virtual host feature is considered out of scope.
+		But you are allowed to implement it if you want." (edu) */
+
 	// A ideia: várias server{} do config podem escutar no mesmo (host,
 	// port) -- é o esquema de virtual hosting (nginx faz igual). Então
 	// em vez de abrir um Socket por Server, você quer agrupar por
