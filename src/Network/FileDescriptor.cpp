@@ -12,12 +12,12 @@ FileDescriptor::~FileDescriptor() {
 }
 
 // Só devolve o número do fd pra quem precisa passar ele numa syscall
-// (bind, listen, accept, etc.) -- não transfere posse, só empresta.
+// (bind, listen, accept, etc.) não transfere posse, só empresta.
 int	FileDescriptor::get() const {
 	return _fd;
 }
 
-// Fecha o fd de verdade, mas só se ainda estiver aberto (_fd >= 0).
+// Fecha o fd de verdade se ainda estiver aberto (_fd >= 0).
 // Depois marca _fd como -1 pra essa mesma chamada não fechar de novo
 // evita double-close se close() for chamado duas vezes.
 void	FileDescriptor::close() {

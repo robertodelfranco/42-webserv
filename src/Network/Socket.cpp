@@ -5,12 +5,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 
-// Função auxiliar só pra construir o fd ANTES de inicializar o membro
-// _fd (FileDescriptor) na initializer list -- se algo aqui der throw, o
-// FileDescriptor nunca chega a existir, então não tem nada pra vazar.
+// Função para construir o socket e configurá-lo.
 static int	createTcpSocket() {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0)
@@ -38,8 +35,7 @@ int	Socket::getFd() const {
 	return _fd.get();
 }
 
-// Fecha o fd antes da hora, sem esperar o destrutor (útil se você
-// precisa soltar o recurso mais cedo que o fim do escopo do Socket).
+// Fecha o fd antes da hora, sem esperar o destrutor.
 void	Socket::close() {
 	_fd.close();
 }
@@ -67,26 +63,28 @@ void	Socket::bind(const std::string& host, unsigned short port) {
 // Marca o fd como socket ouvinte, com a fila de conexões pendentes
 // limitada a `backlog`.
 void	Socket::listen(int backlog) {
-	if (::listen(_fd.get(), backlog) < 0)
+	if (::listen(_fd.get(), backlog) < 0) {
 		throw std::runtime_error("Socket: listen failed");
+	}
 }
 
 // Aceita UMA conexão pendente e devolve o fd dela. Quem chama decide o
 // que fazer (ex.: embrulhar num Socket/Connection novo).
 int	Socket::accept() const {
-	struct sockaddr_in client_addr;
-	socklen_t client_len = sizeof(client_addr);
+	struct sockaddr_in addr;
+	socklen_t addrlen = sizeof(addr);
 
-	int client_fd = ::accept(_fd.get(), reinterpret_cast<struct sockaddr*>(&client_addr), &client_len);
-	if (client_fd < 0)
+	int client_fd = ::accept(_fd.get(), reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
+	if (client_fd < 0) {
 		throw std::runtime_error("Socket: accept failed");
-
+	}
 	return client_fd;
 }
 
 // Deixa o fd non-blocking, pra recv()/accept() nunca travarem esperando
 // dado que ainda não chegou, essencial pro loop de poll() não parar.
 void	Socket::setNonBlocking() {
-	if (fcntl(_fd.get(), F_SETFL, O_NONBLOCK) < 0)
-		throw std::runtime_error("Socket: fcntl(F_SETFL, O_NONBLOCK) failed");
+	if (fcntl(_fd.get(), F_SETFL, O_NONBLOCK) < 0) {
+		throw std::runtime_error("Socket: fcntl(O_NONBLOCK) failed");
+	}
 }
