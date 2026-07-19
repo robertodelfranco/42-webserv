@@ -6,10 +6,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-ServerConfig::ServerConfig() : client_max_body_size(0) {}
+ServerConfig::ServerConfig() : client_max_body_size(1048576) {} // 1MB, mesmo default do nginx -- server é o topo da cadeia, nunca fica "não configurado"
 
 ServerConfig::ServerConfig(const ServerConfig& other)
-	: root(other.root), listens(other.listens), index_files(other.index_files),
+	: root(other.root), listens(other.listens), server_names(other.server_names), index_files(other.index_files),
 	error_page(other.error_page), locations(other.locations),
 	client_max_body_size(other.client_max_body_size) {}
 
@@ -17,6 +17,7 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
 	if (this != &other) {
 		root = other.root;
 		listens = other.listens;
+		server_names = other.server_names;
 		index_files = other.index_files;
 		error_page = other.error_page;
 		locations = other.locations;
@@ -96,6 +97,13 @@ void	ServerConfig::setIndexFiles(const std::vector<std::string>& index_pages) {
 	this->index_files.insert(this->index_files.end(), index_pages.begin(), index_pages.end());
 }
 
+void	ServerConfig::setServerNames(const std::vector<std::string>& names) {
+	if (names.empty())
+		throw std::runtime_error("Server name: at least one name is required");
+
+	this->server_names.insert(this->server_names.end(), names.begin(), names.end());
+}
+
 void	ServerConfig::addLocation(const Location& location) {
 	this->locations.push_back(location); // location já chega completo, montado localmente em getLocationBlock
 }
@@ -106,6 +114,10 @@ const std::string&	ServerConfig::getRoot() const {
 
 const std::vector<Listen>&	ServerConfig::getListens() const {
 	return this->listens;
+}
+
+const std::vector<std::string>&	ServerConfig::getServerNames() const {
+	return this->server_names;
 }
 
 const std::vector<std::string>&	ServerConfig::getIndexFiles() const {

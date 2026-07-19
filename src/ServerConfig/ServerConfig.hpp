@@ -15,7 +15,7 @@ class ServerConfig {
 	private:
 		std::string						root; // caminho root definido
 		std::vector<Listen>				listens; // portas abertas
-		// std::vector<std::string>		host; // host ip (ja tem dentro do listen)
+		std::vector<std::string>		server_names; // nomes desse virtual host (Host: header) -- opcional, fora de escopo do subject
 		std::vector<std::string>		index_files; // arquivos html
 		std::map<int, std::string>		error_page; // páginas de erros definidas no config
 		std::vector<Location>			locations; // cada bloco location dentro de server
@@ -32,10 +32,12 @@ class ServerConfig {
 		void	setBodySize(long long size);
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
 		void	setIndexFiles(const std::vector<std::string>& index_pages);
+		void	setServerNames(const std::vector<std::string>& names);
 		void	addLocation(const Location& location); // adiciona um location já completo no vetor de locations
 
 		const std::string&					getRoot() const;
 		const std::vector<Listen>&			getListens() const;
+		const std::vector<std::string>&	getServerNames() const;
 		const std::vector<std::string>&	getIndexFiles() const;
 		const std::map<int, std::string>&	getErrorPages() const;
 		const std::vector<Location>&		getLocations() const;
