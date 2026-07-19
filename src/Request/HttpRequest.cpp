@@ -18,8 +18,7 @@
 
 /* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest::HttpRequest()
-: raw_(),
-  method_(),
+: method_(),
   path_(),
   httpVersion_(),
   headers_(),
@@ -28,8 +27,7 @@ HttpRequest::HttpRequest()
 
 /* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest::HttpRequest(const HttpRequest &other)
-: raw_(other.raw_),
-  method_(other.method_),
+: method_(other.method_),
   path_(other.path_),
   httpVersion_(other.httpVersion_),
   headers_(other.headers_),
@@ -40,7 +38,6 @@ HttpRequest::HttpRequest(const HttpRequest &other)
 HttpRequest &HttpRequest::operator=(const HttpRequest &other)
 {
     if (this != &other) {
-        raw_         = other.raw_;
         method_      = other.method_;
         path_        = other.path_;
         httpVersion_ = other.httpVersion_;
@@ -57,11 +54,6 @@ HttpRequest::~HttpRequest()
 // =======================
 // Public API
 // =======================
-
-const std::string &HttpRequest::getRaw() const
-{
-    return raw_;
-}
 
 const std::string &HttpRequest::getMethod() const
 {
@@ -119,7 +111,7 @@ const std::string &HttpRequest::getBody() const
 APAGAR TUDO ISSO QUANDO CONCLUIR O CONFIG!!!!!!!!!!!! ------------------------*/
 
 HttpRequest::HttpRequest(const std::string &mock)
-: raw_(), method_(), path_(), httpVersion_("HTTP/1.1"), headers_(), body_()
+: method_(), path_(), httpVersion_("HTTP/1.1"), headers_(), body_()
 {
     if (mock == "MOCK1") {
         method_ = "GET";

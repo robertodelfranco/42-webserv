@@ -29,11 +29,21 @@
 #include <cctype>       
 #include <cstdlib>      
 
+
+// =======================
+// OCF
+// =======================
+
+HttpParser::HttpParser() {}
+HttpParser::HttpParser(const HttpParser &other) {}
+HttpParser &HttpParser::operator=(const HttpParser &other) { return *this; }
+HttpParser::~HttpParser() {}
+
 // =======================
 // Public API
 // =======================
 
-void HttpParser::readFromFd(int fd, HttpRequest &req)
+void HttpParser::readFromFd(int fd)
 {
 	/* vou deixar aqui só pra ser defensive, mas não teria outro motivo além
 	disso. o HTTP 1.0 não suporta pipelining, ou seja, não continua a ler

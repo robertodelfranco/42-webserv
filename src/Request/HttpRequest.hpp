@@ -53,13 +53,35 @@ class HttpRequest
         ~HttpRequest();
 
         // ===== Public API =====
-        const std::string &getRaw() const;
         const std::string &getMethod() const;
         const std::string &getPath() const;
         const std::string &getHTTPVersion() const;
         const std::string &getBody() const;
         std::string        getHeader(const std::string &key) const;
         const std::map<std::string, std::string> &getHeaders() const;
-	};
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    /*--------------------------------------------------------------------------
+                                        ██                          ▄▄     
+    ████▄ ▄█▀█▄ ▄████ ██ ██ ▄█▀█▄ ▄█▀▀▀ ▀██▀▀   ███▄███▄ ▄███▄ ▄████ ██ ▄█▀ 
+    ██ ▀▀ ██▄█▀ ██ ██ ██ ██ ██▄█▀ ▀███▄  ██     ██ ██ ██ ██ ██ ██    ████   
+    ██    ▀█▄▄▄ ▀████ ▀██▀█ ▀█▄▄▄ ▄▄▄█▀  ██     ██ ██ ██ ▀███▀ ▀████ ██ ▀█▄ 
+                ██                                                       
+                ▀▀                                                       
+    /* APAGAR DEPOIS!!! esse aqui é um overload do construtor de HttpRequest
+    só para gerar um objeto de HttpRequest com dados mockados para testes. */
+    HttpRequest(const std::string &mock);
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+
+
+
+    };
 
 #endif
