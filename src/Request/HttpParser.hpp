@@ -22,27 +22,26 @@ class HttpParser
 {
     private:
         // ===== Raw data ===== 
-        /* esse _raw é o request bruto lido diretamente do fd do socket. o
+        /* esse raw_ é o request bruto lido diretamente do fd do socket. o
 		método readFromFd() fica responsável por ir preenchendo. somente depois
 		que a leitura termina, o método parse() entra em ação para preencher
 		os campos do HttpRequest. só funciona porque o HttpParser recebe um
 		HttpRequest como ref& e pode editar os privados porque é "friend". */
-		std::string _raw;
+		std::string raw_;
 
         // ===== Internal helpers =====
-        static bool isValidPath(const std::string &path);
-
-        static bool isValidChunkedBody(const std::string &body);
-        static bool isValidBody(const HttpRequest &req, const std::string &body);
+        bool isValidPath(const std::string &path);
+        bool isValidChunkedBody(const std::string &body);
+        bool isValidBody(const HttpRequest &req, const std::string &body);
 
         // ===== Internal Parsers =====
-        static void parseRequestLine(HttpRequest &req, const std::string &line);
-        static void parseHeadersBlock(HttpRequest &req, const std::string &block);
-        static void parseBody(HttpRequest &req, const std::string &body);
+        void parseRequestLine(HttpRequest &req, const std::string &line);
+        void parseHeadersBlock(HttpRequest &req, const std::string &block);
+        void parseBody(HttpRequest &req, const std::string &body);
 
-        static void setMethod(HttpRequest &req, const std::string &method);
-        static void setPath(HttpRequest &req, const std::string &path);
-        static void setHTTPVersion(HttpRequest &req, const std::string &version);
+        void setMethod(HttpRequest &req, const std::string &method);
+        void setPath(HttpRequest &req, const std::string &path);
+        void setHTTPVersion(HttpRequest &req, const std::string &version);
 
     public:
 		// ===== Canonical form =====
@@ -52,8 +51,8 @@ class HttpParser
 		~HttpParser();
 
 		// ===== Public API =====
-		static void readFromFd(int fd, HttpRequest &req);
-		static void parse(HttpRequest &req);
+		void readFromFd(int fd, HttpRequest &req);
+		void parse(HttpRequest &req);
 
 		// ===== Exceptions =====
 		class MethodException : public std::exception {
@@ -94,47 +93,23 @@ class HttpParser
 
 
 
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    /*--------------------------------------------------------------------------
+                                        ██                          ▄▄     
+    ████▄ ▄█▀█▄ ▄████ ██ ██ ▄█▀█▄ ▄█▀▀▀ ▀██▀▀   ███▄███▄ ▄███▄ ▄████ ██ ▄█▀ 
+    ██ ▀▀ ██▄█▀ ██ ██ ██ ██ ██▄█▀ ▀███▄  ██     ██ ██ ██ ██ ██ ██    ████   
+    ██    ▀█▄▄▄ ▀████ ▀██▀█ ▀█▄▄▄ ▄▄▄█▀  ██     ██ ██ ██ ▀███▀ ▀████ ██ ▀█▄ 
+                ██                                                       
+                ▀▀                                                       
+    /* APAGAR DEPOIS!!! esse aqui é um overload do construtor de HttpRequest
+    só para gerar um objeto de HttpRequest com dados mockados para testes. */
+    HttpRequest(const std::string &mock);
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
 
-	// ===== Public API =====
-        static void readFromFd(int fd, HttpRequest &req);
-        static void parse(HttpRequest &req);
-
-        // ===== Exceptions =====
-        class MethodException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
-
-        class PathException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
-
-        class HTTPVersionException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
-
-        class HeaderException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
-
-        class BodyException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
-
-        class ParseException : public std::exception {
-        public:
-            ParseException(const std::string &msg);
-            ParseException(const ParseException &other);
-            ParseException &operator=(const ParseException &other);
-            virtual ~ParseException() throw();
-            virtual const char *what() const throw();
-        private:
-            std::string _msg;
-        };
 };
 
 std::string toLower(const std::string &s);

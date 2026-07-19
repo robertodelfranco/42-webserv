@@ -18,7 +18,7 @@
 
 /* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest::HttpRequest()
-: _raw(),
+: raw_(),
   method_(),
   path_(),
   httpVersion_(),
@@ -28,7 +28,7 @@ HttpRequest::HttpRequest()
 
 /* não precisaria, mas está aqui para seguir a forma canônica. */
 HttpRequest::HttpRequest(const HttpRequest &other)
-: _raw(other._raw),
+: raw_(other.raw_),
   method_(other.method_),
   path_(other.path_),
   httpVersion_(other.httpVersion_),
@@ -40,7 +40,7 @@ HttpRequest::HttpRequest(const HttpRequest &other)
 HttpRequest &HttpRequest::operator=(const HttpRequest &other)
 {
     if (this != &other) {
-        _raw         = other._raw;
+        raw_         = other.raw_;
         method_      = other.method_;
         path_        = other.path_;
         httpVersion_ = other.httpVersion_;
@@ -60,7 +60,7 @@ HttpRequest::~HttpRequest()
 
 const std::string &HttpRequest::getRaw() const
 {
-    return _raw;
+    return raw_;
 }
 
 const std::string &HttpRequest::getMethod() const
@@ -94,4 +94,56 @@ std::string HttpRequest::getHeader(const std::string &key) const
 const std::string &HttpRequest::getBody() const
 {
     return body_;
+}
+
+/////// fim ////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+/*                                                                             
+/*------------------------------------------------------------------------------
+                                     ██                          ▄▄     
+████▄ ▄█▀█▄ ▄████ ██ ██ ▄█▀█▄ ▄█▀▀▀ ▀██▀▀   ███▄███▄ ▄███▄ ▄████ ██ ▄█▀ 
+██ ▀▀ ██▄█▀ ██ ██ ██ ██ ██▄█▀ ▀███▄  ██     ██ ██ ██ ██ ██ ██    ████   
+██    ▀█▄▄▄ ▀████ ▀██▀█ ▀█▄▄▄ ▄▄▄█▀  ██     ██ ██ ██ ▀███▀ ▀████ ██ ▀█▄ 
+               ██                                                       
+               ▀▀                                                       
+APAGAR TUDO ISSO QUANDO CONCLUIR O CONFIG!!!!!!!!!!!! ------------------------*/
+
+HttpRequest::HttpRequest(const std::string &mock)
+: raw_(), method_(), path_(), httpVersion_("HTTP/1.1"), headers_(), body_()
+{
+    if (mock == "MOCK1") {
+        method_ = "GET";
+        path_   = "/index.html";
+    }
+    else if (mock == "MOCK2") {
+        method_ = "GET";
+        path_   = "/uploads/";
+    }
+    else if (mock == "MOCK3") {
+        method_ = "GET";
+        path_   = "/uploads";
+    }
+    else if (mock == "MOCK4") {
+        method_ = "POST";
+        path_   = "/uploads/novo.txt";
+        body_   = "conteudo do arquivo enviado";
+        headers_["Content-Type"]   = "text/plain";
+        headers_["Content-Length"] = "27";
+    }
+    else if (mock == "MOCK5") {
+        method_ = "DELETE";
+        path_   = "/uploads/novo.txt";
+    }
+    else
+        exit(1);
 }
