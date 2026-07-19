@@ -6,18 +6,23 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/25 16:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2026/07/18 20:38:33 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/07/19 11:44:34 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 /*
 
     TODO:	finish recv implementation
+			O readFromFd() está fora das especificações do subject.
 
 	TODO:	IDENTIFICAR EM QUAL PARTE DO CÓDIGO ESTAMOS REJEITANDO PIPELINING.
 			pipelining = client envia vários requests no mesmo raw sem esperar
-			resposta do servidor. daí o servidor segura cada request  
-
+			resposta do servidor. daí o servidor segura cada request. Não temos
+			que lidar com isso, se o fd mandar mais do que deve, podemos recusar
+			o request inteiro e devolver um erro de request mal formado. Porém
+			não podemos confundir pipelining com keep-alive. O keep-alive tem
+			a ver com o fd não ser fechado, mas o request em si tem que ser
+			completo. (edu)
 */
 
 #include "HttpParser.hpp"
@@ -45,21 +50,35 @@ HttpParser::~HttpParser() {}
 
 void HttpParser::readFromFd(int fd)
 {
-	/* vou deixar aqui só pra ser defensive, mas não teria outro motivo além
-	disso. o HTTP 1.0 não suporta pipelining, ou seja, não continua a ler
-	multiplo requests chegando pelo mesmo client. inclusive, se chegar mais
-	bytes além do esperado, acho que é o caso de rejeitar o request inteiro
-	e devolver um error de request mal formado. (edu) */
+	/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	
+	TODO esse readFromFd() está fora das especificações do subject. A leitura
+	deve ser não-bloqueante, o que não é o caso aqui - o while só para quando 
+	todo o raw_ tiver sido recebido. porém o subject deixa explícito que cada
+	chamada a recv() deve ser intermediada pelo eventloop e o poll(). não faz
+	sentido eu mexer muito aqui agora sem entender como o eventloop funciona.
+
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
 	raw_.clear();
 
     char    buffer[4096];
     ssize_t n;
 
-    while ((n = recv(fd, buffer, sizeof(buffer), 0)) > 0) {
-        raw_.append(buffer, n);
-        if (n < (ssize_t)sizeof(buffer))
-            break;
-    }
+	while (true)
+	{
+		n = recv(fd, buffer, sizeof(buffer), 0);
+
+		 // 0 = cliente fechou a conexão; -1 = erro / "sem dados agora"
+		if (n <= 0) 
+			break;
+
+		raw_.append(buffer, n);
+
+		// li menos que o tamanho do buffer cheio 
+		if (n < static_cast<ssize_t>(sizeof(buffer)))
+			break;
+	}
 
     if (raw_.empty())
         throw ParseException("Empty HTTP request (no data read from socket)");
@@ -335,4 +354,70 @@ HttpParser::ParseException::~ParseException() throw()
 const char *HttpParser::ParseException::what() const throw()
 {
     return _msg.c_str();
+}
+
+
+
+/////// fim ////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+/*------------------------------------------------------------------------------
+▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀
+                                 ▄▄                                                 
+                     ▄▄          ██                                                 
+███▄███▄ ▄███▄ ▄████ ██ ▄█▀   ▄████ ▄█▀█▄   ████▄  ▀▀█▄ ██   ██                     
+██ ██ ██ ██ ██ ██    ████     ██ ██ ██▄█▀   ██ ▀▀ ▄█▀██ ██ █ ██                     
+██ ██ ██ ▀███▀ ▀████ ██ ▀█▄   ▀████ ▀█▄▄▄   ██    ▀█▄██  ██▀██                      
+                                                              ▄▄▄▄▄▄▄▄              
+                                                                                    
+
+▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ ▀▀▀▀▀ */
+
+std::string raw_mock(int type) {
+
+	std::string raw1 =
+		"GET /index.html HTTP/1.1\r\n"
+		"Host: localhost:8080\r\n"
+		"\r\n";
+
+	std::string raw2 =
+		"GET /uploads/ HTTP/1.1\r\n"
+		"Host: localhost:8080\r\n"
+		"\r\n";
+
+	std::string raw3 =
+		"GET /uploads HTTP/1.1\r\n"
+		"Host: localhost:8080\r\n"
+		"\r\n";
+
+	std::string raw4 =
+		"POST /uploads/novo.txt HTTP/1.1\r\n"
+		"Host: localhost:8080\r\n"
+		"Content-Type: text/plain\r\n"
+		"Content-Length: 27\r\n"
+		"\r\n"
+		"conteudo do arquivo enviado";
+
+	std::string raw5 =
+		"DELETE /uploads/novo.txt HTTP/1.1\r\n"
+		"Host: localhost:8080\r\n"
+		"\r\n";
+
+	switch (type) {
+		case 1: return raw1;
+		case 2: return raw2;
+		case 3: return raw3;
+		case 4: return raw4;
+		case 5: return raw5;
+		default: return "";
+	}
 }

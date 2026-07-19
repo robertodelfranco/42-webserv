@@ -6,7 +6,7 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/24 17:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2026/07/18 20:37:36 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/07/19 10:45:26 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -111,31 +111,39 @@ const std::string &HttpRequest::getBody() const
 APAGAR TUDO ISSO QUANDO CONCLUIR O CONFIG!!!!!!!!!!!! ------------------------*/
 
 HttpRequest::HttpRequest(const std::string &mock)
-: method_(), path_(), httpVersion_("HTTP/1.1"), headers_(), body_()
+: method_(), path_(), httpVersion_(), headers_(), body_()
 {
-    if (mock == "MOCK1") {
-        method_ = "GET";
-        path_   = "/index.html";
-    }
-    else if (mock == "MOCK2") {
-        method_ = "GET";
-        path_   = "/uploads/";
-    }
-    else if (mock == "MOCK3") {
-        method_ = "GET";
-        path_   = "/uploads";
-    }
-    else if (mock == "MOCK4") {
-        method_ = "POST";
-        path_   = "/uploads/novo.txt";
-        body_   = "conteudo do arquivo enviado";
-        headers_["Content-Type"]   = "text/plain";
-        headers_["Content-Length"] = "27";
-    }
-    else if (mock == "MOCK5") {
-        method_ = "DELETE";
-        path_   = "/uploads/novo.txt";
-    }
-    else
-        exit(1);
+	if (mock == "MOCK1") {
+		method_				= "GET";
+		path_				= "/index.html";
+		httpVersion_		= "HTTP/1.1";
+		headers_["host"]	= "localhost:8080";
+	}
+	else if (mock == "MOCK2") {
+		method_			= "GET";
+		path_			= "/uploads/";
+		httpVersion_	= "HTTP/1.0";
+	}
+	else if (mock == "MOCK3") {
+		method_				= "GET";
+		path_				= "/uploads";
+		httpVersion_		= "HTTP/1.1";
+		headers_["host"]	= "localhost:8080";
+	}
+	else if (mock == "MOCK4") {
+		method_			= "POST";
+		path_			= "/uploads/novo.txt";
+		httpVersion_	= "HTTP/1.1";
+		body_			= "conteudo do arquivo enviado";
+		headers_["host"]			= "localhost:8080";
+		headers_["content-type"]	= "text/plain";
+		headers_["content-length"]	= "27";
+	}
+	else if (mock == "MOCK5") {               
+		method_			= "DELETE";
+		path_			= "/uploads/novo.txt";
+		httpVersion_	= "HTTP/1.0";
+	}
+	else
+		exit(1);
 }
