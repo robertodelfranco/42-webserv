@@ -10,7 +10,7 @@ void	Location::setRoot(const std::string& root) {
 	if (root.empty())
 		throw std::runtime_error("Root: path is required");
 	if (root[0] != '/' && root[0] != '.')
-		throw std::runtime_error("Root: path must be absolute or relative to config file '" + root + "'");
+		throw std::runtime_error("Root: path must start with '/' (absolute) or './' (relative) '" + root + "'");
 
 	struct stat info;
 	if (stat(root.c_str(), &info) != 0)
@@ -37,7 +37,7 @@ void	Location::setErrorPages(const std::vector<int>& error_pages, const std::str
 		throw std::runtime_error("Error page: path is required");
 
 	if (path[0] != '/' && path[0] != '.')
-		throw std::runtime_error("Error page: path must be absolute or relative to config file '" + path + "'");
+		throw std::runtime_error("Error page: path must start with '/' (absolute) or './' (relative) '" + path + "'");
 
 	for (size_t i = 0; i < error_pages.size(); ++i) {
 		this->error_page.insert(std::make_pair(error_pages[i], path));
@@ -91,7 +91,7 @@ void	Location::setUploadPath(const std::string& path) {
 	if (path.empty())
 		throw std::runtime_error("Upload path: path is required");
 	if (path[0] != '/' && path[0] != '.')
-		throw std::runtime_error("Upload path: path must be absolute or relative to config file '" + path + "'");
+		throw std::runtime_error("Upload path: path must start with '/' (absolute) or './' (relative) '" + path + "'");
 
 	struct stat info;
 	if (stat(path.c_str(), &info) != 0)

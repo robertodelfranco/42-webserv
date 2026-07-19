@@ -69,7 +69,7 @@ size_t	ConfigLexer::consumeName(const std::string& line, size_t count_line, size
 		if (c == '\'' || c == '"')
 			throw ConfigParseError("Invalid quotes in name", count_line, col, line);
 
-		if (c == '\0' && c < 32)
+		if (c < 32 || c == 127)
 			throw ConfigParseError("Unexpected control character in name", count_line, col, line);
 
 		++col;
@@ -140,7 +140,7 @@ size_t	ConfigLexer::consumePath(const std::string& line, size_t count_line, size
 		if (c == '\'' || c == '"')
 			throw ConfigParseError("Invalid quotes in path", count_line, col, line);
 
-		if (c < 32)
+		if (c < 32 || c == 127)
 			throw ConfigParseError("Unexpected control character in path", count_line, col, line);
 
 		++col;

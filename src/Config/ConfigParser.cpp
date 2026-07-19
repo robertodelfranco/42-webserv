@@ -37,7 +37,7 @@ std::vector<ServerConfig>	ConfigParser::parse(const std::vector<Token>& tokens_p
 		if (it->type == END_OF_STREAM)
 			break ;
 		if (it->type == DIRECTIVE && it->value != "server")
-			throw ConfigParseError("WARNING - directive out of server block is ignored", it->line, it->col, it->value);
+			throw ConfigParseError("Directive '" + it->value + "' not allowed outside a server block", it->line, it->col, it->value);
 		it = getServerBlock(it, ite, servers); // validate server and then call consume diretive and location block
 	}
 
