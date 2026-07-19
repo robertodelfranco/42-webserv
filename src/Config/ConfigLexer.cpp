@@ -2,7 +2,6 @@
 #include "ConfigParseError.hpp"
 #include "../Utils/Utils.hpp"
 #include <fstream>
-#include <iostream>
 #include <cctype>
 
 static bool	is_directive_char(unsigned char c) {
@@ -217,17 +216,13 @@ void	ConfigLexer::consumeLine(std::string& line, size_t count_line) {
 }
 
 bool	ConfigLexer::tokenize(const char *file) {
-	if (!file || !*file) {
-		std::cerr << "Nenhum arquivo de configuração foi encontrado" << std::endl;
-		return false;
-	}
+	if (!file || !*file)
+		return false; // quem chama (Config::load) decide como reportar isso
 
 	std::ifstream	config_file(file);
 
-	if (!config_file) {
-		std::cerr << "Erro ao abrir o arquivo de configuração: " << file << std::endl;
-		return false;
-	}
+	if (!config_file)
+		return false; // idem -- não abriu, quem chama decide a mensagem
 
 	std::string line;
 	size_t	count_lines = 1;

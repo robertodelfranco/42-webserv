@@ -31,7 +31,7 @@ struct DirectiveHandler {
 class ConfigParser {
 	private:
 		std::map<std::string, DirectiveHandler>	handlers;
-		std::vector<Token>							tokens; // cópia do que parse() recebeu -- getLocationBlock precisa de tokens.end() e não pode ganhar esse parâmetro (assinatura presa ao TokenHandler)
+		std::vector<Token>						tokens; // cópia do que parse() recebeu, getLocationBlock precisa de tokens.end() e não pode ganhar esse parâmetro (assinatura presa ao TokenHandler)
 
 		std::vector<Token>::iterator	getServerBlock(std::vector<Token>::iterator& start, std::vector<Token>::iterator end, std::vector<ServerConfig>& servers);
 		void							consumeSemiColon(std::vector<Token>::iterator& it);
@@ -47,6 +47,8 @@ class ConfigParser {
 		void							getRedirect(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getCgi(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getCgiPath(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getAutoindex(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
+		void							getUploadPath(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getLocationBlock(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& start);
 
 	public:

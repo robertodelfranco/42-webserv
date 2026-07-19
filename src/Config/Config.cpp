@@ -1,7 +1,7 @@
 #include "Config.hpp"
 #include "ConfigLexer.hpp"
 #include "ConfigParser.hpp"
-#include <iostream>
+#include <stdexcept>
 
 Config::Config() : servers() {}
 
@@ -11,8 +11,8 @@ void	Config::load(const char *file) {
 	ConfigLexer	lexer;
 
 	if (!lexer.tokenize(file)) {
-		std::cerr << "WARNING - Config file '" << file << "' is null, empty, or could not be opened. Using default configuration." << std::endl;
-		return; // arquivo nulo/vazio/não abriu
+		std::string name = (file && *file) ? file : "(nenhum arquivo informado)";
+		throw std::runtime_error("Config: não foi possível abrir o arquivo de configuração '" + name + "'");
 	}
 
 	ConfigParser	parser;

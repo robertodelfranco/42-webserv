@@ -16,6 +16,8 @@ ConfigParser::ConfigParser() : handlers(), tokens() {
 	handlers[std::string("return")] = (DirectiveHandler){&ConfigParser::getRedirect, LOCATION, SIMPLE};
 	handlers[std::string("cgi_type")] = (DirectiveHandler){&ConfigParser::getCgi, LOCATION, SIMPLE};
 	handlers[std::string("cgi_path")] = (DirectiveHandler){&ConfigParser::getCgiPath, LOCATION, SIMPLE};
+	handlers[std::string("autoindex")] = (DirectiveHandler){&ConfigParser::getAutoindex, LOCATION, SIMPLE};
+	handlers[std::string("upload_path")] = (DirectiveHandler){&ConfigParser::getUploadPath, LOCATION, SIMPLE};
 	handlers[std::string("location")] = (DirectiveHandler){&ConfigParser::getLocationBlock, SERVER, BLOCK};
 }
 
@@ -66,9 +68,22 @@ void	ConfigParser::getListen(ServerConfig& server, Location* location_pointer, s
 }
 
 void	ConfigParser::getServerName(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)server;
-	(void)location_pointer;
-	(void)it;
+	(void)location_pointer; // server_name é server-only, contexto já garante location_pointer == NULL
+	++it;
+	if (it->type != STRING)
+		throw ConfigParseError("Invalid server_name argument", it->line, it->col, it->value);
+
+	std::vector<std::string> names;
+	while (it->type == STRING) {
+		std::string value = Utils::trim(it->value);
+		if (value.empty())
+			throw ConfigParseError("Empty server_name value", it->line, it->col, it->value);
+
+		names.push_back(value);
+		++it;
+	}
+
+	server.setServerNames(names);
 }
 
 void	ConfigParser::getBodySize(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
@@ -284,6 +299,36 @@ void	ConfigParser::getCgiPath(ServerConfig& server, Location* location_pointer, 
 	++it;
 }
 
+void	ConfigParser::getAutoindex(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)server; // autoindex é location-only, contexto já garante location_pointer != NULL
+	++it;
+	if (it->type != STRING)
+		throw ConfigParseError("Invalid autoindex argument", it->line, it->col, it->value);
+
+	std::string value = Utils::trim(it->value);
+
+	if (value != "on" && value != "off")
+		throw ConfigParseError("Invalid autoindex value '" + value + "' (expected 'on' or 'off')", it->line, it->col, it->value);
+
+	location_pointer->setAutoindex(value == "on");
+	++it;
+}
+
+void	ConfigParser::getUploadPath(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
+	(void)server; // upload_path é location-only, contexto já garante location_pointer != NULL
+	++it;
+	if (it->type != PATH)
+		throw ConfigParseError("Invalid upload path argument", it->line, it->col, it->value);
+
+	std::string path = Utils::trim(it->value);
+
+	if (path.empty())
+		throw ConfigParseError("Empty upload path value", it->line, it->col, it->value);
+
+	location_pointer->setUploadPath(path);
+	++it;
+}
+
 void	ConfigParser::getLocationBlock(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& start) {
 	(void)location_pointer; // sempre NULL aqui -- location block não aninha
 	if (start->type != DIRECTIVE || start->value != "location")
@@ -296,6 +341,12 @@ void	ConfigParser::getLocationBlock(ServerConfig& server, Location* location_poi
 	std::string location_path = Utils::trim(start->value);
 	if (location_path.empty())
 		throw ConfigParseError("Empty location path value", start->line, start->col, start->value);
+
+	const std::vector<Location>& existing_locations = server.getLocations();
+	for (size_t i = 0; i < existing_locations.size(); ++i) {
+		if (existing_locations[i].path == location_path)
+			throw ConfigParseError("Duplicate location path '" + location_path + "'", start->line, start->col, start->value);
+	}
 	++start;
 
 	if (start->type != SYMBOL || start->value != "{")
@@ -318,6 +369,7 @@ void	ConfigParser::getLocationBlock(ServerConfig& server, Location* location_poi
 	if (start == tokens.end())
 		throw ConfigParseError("Expected closing brace for location block", tokens.back().line, tokens.back().col, std::string());
 
+	location.mergeDefaults(server); // preenche root/index/error_page/client_max_body_size que o location não declarou com o valor do server
 	server.addLocation(location); // única cópia, adiciona o location ao vetor de locations do server
 }
 
@@ -351,6 +403,8 @@ void	ConfigParser::getDirective(ServerConfig& server, Location* location_pointer
 }
 
 std::vector<Token>::iterator	ConfigParser::getServerBlock(std::vector<Token>::iterator& start, std::vector<Token>::iterator end, std::vector<ServerConfig>& servers) {
+	size_t	server_line = start->line;
+	size_t	server_col = start->col;
 
 	++start;
 	if (start->value != "{")
@@ -373,6 +427,13 @@ std::vector<Token>::iterator	ConfigParser::getServerBlock(std::vector<Token>::it
 			break ;
 		}
 	}
+
+	if (server.getListens().empty())
+		throw ConfigParseError("Server block must have at least one 'listen' directive", server_line, server_col, std::string());
+
+	if (server.getRoot().empty())
+		throw ConfigParseError("Server block must have a 'root' directive", server_line, server_col, std::string());
+
 	servers.push_back(server);
 	return start;
 }
