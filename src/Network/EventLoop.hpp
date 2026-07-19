@@ -10,7 +10,7 @@
 
 // Dono de tudo que é rede: os sockets ouvintes e as conexões ativas.
 // É o único lugar que enxerga tanto Config (Server/Location) quanto
-// Network (Socket/Connection) -- Config nunca inclui nada daqui.
+// Network (Socket/Connection), Config nunca inclui nada daqui.
 class EventLoop {
 	private:
 		std::vector<Server>							_servers; // saída de Config::getServers(), copiada uma vez na construção
@@ -22,7 +22,7 @@ class EventLoop {
 		EventLoop& operator=(const EventLoop& other);
 
 		// Agrupa _servers por (host,port) único (várias server{} podem
-		// compartilhar o mesmo endpoint -- virtual hosting) e abre UM
+		// compartilhar o mesmo endpoint, virtual hosting) e abre UM
 		// Socket ouvinte por grupo, guardando os candidatos em paralelo.
 		void	openListeners();
 
@@ -30,12 +30,12 @@ class EventLoop {
 		explicit EventLoop(const std::vector<Server>& servers);
 		~EventLoop();
 
-		// TODO (Roberto): run() -- o loop de verdade:
-		// 1. montar um std::vector<pollfd> com _listeners + _connections
-		// 2. chamar ::poll() UMA vez por volta (nunca ler/escrever sem passar por ele antes)
-		// 3. POLLIN num listener -> accept() e criar uma Connection nova (com os candidatos daquele índice)
-		// 4. POLLIN numa Connection -> ela lê mais bytes pro próprio buffer
-		// 5. POLLOUT numa Connection -> ela manda o que sobrou do buffer de resposta
+		// To Do : run() -- o loop de verdade:
+		// montar um std::vector<pollfd> com _listeners + _connections
+		// chamar ::poll() UMA vez por volta (nunca ler/escrever sem passar por ele antes)
+		// POLLIN num listener -> accept() e criar uma Connection nova (com os candidatos daquele índice)
+		// POLLIN numa Connection -> ela lê mais bytes pro próprio buffer
+		// POLLOUT numa Connection -> ela manda o que sobrou do buffer de resposta
 		void	run();
 };
 
