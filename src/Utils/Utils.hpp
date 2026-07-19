@@ -1,20 +1,13 @@
 #ifndef UTILS_HPP
 # define UTILS_HPP
 
-#include "structs.hpp"
+#include <string>
 
-class Utils {
-	private:
-		Utils();
-		Utils(const Utils& other);
-		Utils& operator=(const Utils& other);
-		~Utils();
-	
-	public:
-	static void			ref_trim(std::string& str);
-	static bool			has_char(const char *str, char c);
-	static bool			has_char(const std::string& str, char c);
-	static std::string	trim(const std::string& str);
-};
+namespace Utils {
+	void			ref_trim(std::string& str);
+	bool			has_char(const char *str, char c);
+	bool			has_char(const std::string& str, char c);
+	std::string		trim(const std::string& str);
+}
 
 #endif
