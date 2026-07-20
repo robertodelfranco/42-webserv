@@ -3,8 +3,15 @@
 // Copia os Server parseados (não deveriam mudar depois disso) e já abre
 // os sockets ouvintes -- depois do construtor, o EventLoop está pronto
 // pra rodar run().
+
+/*	style guide google: "if the signature and initializer list are not
+	all on one line, you must wrap before the colon and indent 4 spaces."
+	sim, sou fresco rs... fica muito feio tudo numa linha. (edu) */
 EventLoop::EventLoop(const std::vector<Server>& servers)
-: _servers(servers), _listeners(), _listenerCandidates(), _connections() {
+	: _servers(servers),
+	  _listeners(),
+	  _listenerCandidates(),
+	  _connections() {
 	openListeners();
 }
 
@@ -14,13 +21,23 @@ EventLoop::~EventLoop() {
 	for (size_t i = 0; i < _listeners.size(); ++i)
 		delete _listeners[i];
 
-	for (std::map<int, Connection*>::iterator it = _connections.begin(); it != _connections.end(); ++it)
+	for (std::map<int, Connection*>::iterator it = _connections.begin();
+		it != _connections.end(); ++it)
 		delete it->second;
 }
 
 void	EventLoop::openListeners() {
 	// TODO: implementar o agrupamento + abertura dos sockets.
 	//
+	
+	/*	o subject diz explicitamente que virtual hosting não é obrigatório.
+		precisa avaliar se vale a pena a implementação. na página 9:
+		"We deliberately chose to offer only a subset of the HTTP RFC.
+		In this context, the virtual host feature is considered out of scope.
+		But you are allowed to implement it if you want." (edu) 
+		é muito mais simples recusar o um arquivo de config que tente 
+		definir mais de um server{} com o mesmo (host, port). (edu) */
+
 	// A ideia: várias server{} do config podem escutar no mesmo (host,
 	// port) -- é o esquema de virtual hosting (nginx faz igual). Então
 	// em vez de abrir um Socket por Server, você quer agrupar por
