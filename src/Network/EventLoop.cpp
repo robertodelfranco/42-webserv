@@ -10,7 +10,7 @@
 EventLoop::EventLoop(const std::vector<Server>& servers)
 	: _servers(servers),
 	  _listeners(),
-	  _listenerCandidates(),
+	  _listenerServers(),
 	  _connections() {
 	openListeners();
 }

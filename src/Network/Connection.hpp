@@ -25,14 +25,12 @@ class Connection {
 		~Connection();
 
 		int	getFd() const;
-
+	
 		// TODO: onReadable() -> recv() do que estiver disponível
 		// agora pra _readBuffer; tentar parsear quando já tiver o
 		// suficiente (fim dos headers, depois body completo).
 		// TODO: onWritable() -> send() do que sobrar em
 		// _writeBuffer; ir descontando o que foi enviado de fato.
-		// TODO: resolveServer() -> escolher o Server certo em
-		// _candidates a partir do header Host: (fallback: o primeiro).
 };
 
 #endif
