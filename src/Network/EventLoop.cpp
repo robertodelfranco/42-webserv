@@ -109,3 +109,44 @@ void	EventLoop::run() {
 		}
 	}
 }
+
+// para evitar if/else
+
+/*
+if (returnCode < 0) {
+	if (errno == EINTR)
+		continue;
+	throw std::runtime_error("EventLoop: poll failed");
+}
+if (returnCode == 0) {
+	// comparar com o timeout e fechar conexões inativas
+	continue;
+}
+
+for (size_t i = 0; i < pollfds.size(); ++i) {
+	...
+}
+*/
+
+/*
+for (size_t i = 0; i < _listeners.size(); ++i) {
+	if (!(pollfds[i].revents & POLLIN))
+		continue;
+	try {
+		int clientFd = _listeners[i]->accept();
+		Connection* conn = new Connection(clientFd, _listenerServers[i]);
+		_connections[clientFd] = conn;
+	} catch (const std::exception& e) {
+		std::cerr << "EventLoop: accept failed: " << e.what() << "\n";
+	}
+}
+
+for (size_t i = _listeners.size(); i < pollfds.size(); ++i) {
+	if (pollfds[i].revents & POLLIN) {
+		// TODO: onReadable(). POLLHUP e POLLERR entram aqui também
+	}
+	if (pollfds[i].revents & POLLOUT) {
+		// TODO: onWritable()
+	}
+}
+*/
