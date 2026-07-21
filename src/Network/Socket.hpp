@@ -14,8 +14,8 @@ class Socket {
 		Socket& operator=(const Socket& other);
 
 	public:
-		Socket();                // cria um socket TCP novo (AF_INET, SOCK_STREAM) com SO_REUSEADDR
-		explicit Socket(int fd); // embrulha um fd já existente (ex.: o retorno de accept())
+		Socket();
+		explicit Socket(int fd);
 		~Socket();
 
 		int		getFd() const;
@@ -23,7 +23,7 @@ class Socket {
 
 		void	bind(const std::string& host, unsigned short port);
 		void	listen(int backlog);
-		int		accept() const; // retorna o fd aceito; quem chama decide o que fazer com ele
+		int		accept() const;
 		void	setNonBlocking();
 };
 

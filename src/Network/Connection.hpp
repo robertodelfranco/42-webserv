@@ -15,13 +15,13 @@ class Connection {
 		FileDescriptor				_fd;
 		std::string					_readBuffer;  // bytes recebidos até agora, ainda não processados
 		std::string					_writeBuffer; // resposta pendente de ser enviada
-		std::vector<const Server*>	_candidates;  // Server(s) candidatos deste endpoint (host:port); resolvido de fato pelo header Host: quando a request chegar
+		const Server*				_candidate;  // Server(s) candidatos deste endpoint (host:port); resolvido de fato pelo header Host: quando a request chegar
 
 		Connection(const Connection& other);
 		Connection& operator=(const Connection& other);
 
 	public:
-		Connection(int fd, const std::vector<const Server*>& candidates);
+		Connection(int fd, const Server* candidate);
 		~Connection();
 
 		int	getFd() const;

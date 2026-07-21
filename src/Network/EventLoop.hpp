@@ -13,10 +13,10 @@
 // Network (Socket/Connection), Config nunca inclui nada daqui.
 class EventLoop {
 	private:
-		std::vector<Server>							_servers; // saída de Config::getServers(), copiada uma vez na construção
-		std::vector<Socket*>						_listeners; // um Socket ouvinte por endpoint (host,port) único
-		std::vector<std::vector<const Server*> >	_listenerCandidates; // mesmo índice de _listeners: quais Server atendem aquele endpoint
-		std::map<int, Connection*>					_connections; // fd -> conexão ativa
+		std::vector<Server>			_servers; // saída de Config::getServers(), copiada uma vez na construção
+		std::vector<Socket*>		_listeners; // um Socket ouvinte por endpoint (host,port) único
+		std::vector<const Server*>	_listenerServers; // mesmo índice de _listeners: lista de servidores
+		std::map<int, Connection*>	_connections; // fd -> conexão ativa
 
 		EventLoop(const EventLoop& other);
 		EventLoop& operator=(const EventLoop& other);
