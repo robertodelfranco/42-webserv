@@ -25,6 +25,7 @@ class Socket {
 		void	listen(int backlog);
 		int		accept() const;
 		void	setNonBlocking();
+		static void	setNonBlocking(int fd); // aplica O_NONBLOCK direto num fd cru, sem exigir posse (usado pelo fd vindo de accept())
 };
 
 #endif

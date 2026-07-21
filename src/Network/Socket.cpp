@@ -66,14 +66,18 @@ int	Socket::accept() const {
 	socklen_t addrlen = sizeof(addr);
 
 	int client_fd = ::accept(_fd.get(), reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
-	if (client_fd < 0) {
+
+	if (client_fd < 0)
 		throw std::runtime_error("Socket: accept failed");
-	}
+
 	return client_fd;
 }
 
 void	Socket::setNonBlocking() {
-	if (fcntl(_fd.get(), F_SETFL, O_NONBLOCK) < 0) {
+	setNonBlocking(_fd.get());
+}
+
+void	Socket::setNonBlocking(int fd) {
+	if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)
 		throw std::runtime_error("Socket: fcntl(O_NONBLOCK) failed");
-	}
 }

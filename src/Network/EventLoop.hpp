@@ -14,28 +14,21 @@
 class EventLoop {
 	private:
 		std::vector<Server>			_servers; // saída de Config::getServers(), copiada uma vez na construção
-		std::vector<Socket*>		_listeners; // um Socket ouvinte por endpoint (host,port) único
-		std::vector<const Server*>	_listenerServers; // mesmo índice de _listeners: lista de servidores
+		std::vector<Socket*>		_listeners;	// onde ficam os sockets ouvintes
+		std::vector<const Server*>	_listenerServers; // onde ficam os Servers que correspondem a cada listener
 		std::map<int, Connection*>	_connections; // fd -> conexão ativa
 
 		EventLoop(const EventLoop& other);
 		EventLoop& operator=(const EventLoop& other);
 
-		// Agrupa _servers por (host,port) único (várias server{} podem
-		// compartilhar o mesmo endpoint, virtual hosting) e abre UM
-		// Socket ouvinte por grupo, guardando os candidatos em paralelo.
+		// Agrupa _servers por (host,port) único e abre UM
+		// Socket ouvinte por grupo, cada socket representa um endpoint.
 		void	openListeners();
 
 	public:
 		explicit EventLoop(const std::vector<Server>& servers);
 		~EventLoop();
 
-		// To Do : run() -- o loop de verdade:
-		// montar um std::vector<pollfd> com _listeners + _connections
-		// chamar ::poll() UMA vez por volta (nunca ler/escrever sem passar por ele antes)
-		// POLLIN num listener -> accept() e criar uma Connection nova (com os candidatos daquele índice)
-		// POLLIN numa Connection -> ela lê mais bytes pro próprio buffer
-		// POLLOUT numa Connection -> ela manda o que sobrou do buffer de resposta
 		void	run();
 };
 

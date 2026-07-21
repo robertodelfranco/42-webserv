@@ -1,8 +1,11 @@
 #include "EventLoop.hpp"
+#include <poll.h>
+#include <cerrno>
+#include <stdexcept>
+#include <iostream>
 
 // Copia os Server parseados (não deveriam mudar depois disso) e já abre
-// os sockets ouvintes -- depois do construtor, o EventLoop está pronto
-// pra rodar run().
+// os sockets ouvintes.
 
 /*	style guide google: "if the signature and initializer list are not
 	all on one line, you must wrap before the colon and indent 4 spaces."
@@ -27,40 +30,82 @@ EventLoop::~EventLoop() {
 }
 
 void	EventLoop::openListeners() {
-	// TODO: implementar o agrupamento + abertura dos sockets.
-	//
-	
-	/*	o subject diz explicitamente que virtual hosting não é obrigatório.
-		precisa avaliar se vale a pena a implementação. na página 9:
-		"We deliberately chose to offer only a subset of the HTTP RFC.
-		In this context, the virtual host feature is considered out of scope.
-		But you are allowed to implement it if you want." (edu) 
-		é muito mais simples recusar o um arquivo de config que tente 
-		definir mais de um server{} com o mesmo (host, port). (edu) */
-
-	// A ideia: várias server{} do config podem escutar no mesmo (host,
-	// port) -- é o esquema de virtual hosting (nginx faz igual). Então
-	// em vez de abrir um Socket por Server, você quer agrupar por
-	// endpoint único primeiro:
-	//
-	// 1. Percorra _servers; pra cada Server, percorra server.getListens().
-	// 2. Use algo como std::map<std::pair<std::string, unsigned short>,
-	//    std::vector<const Server*> > pra juntar, por (host, port), quais
-	//    Server* (ponteiro pro elemento dentro de _servers) atendem
-	//    aquele endpoint.
-	// 3. Pra cada grupo único do map: `new Socket()`, `bind(host, port)`,
-	//    `listen(backlog)`, `setNonBlocking()`, e guarde o Socket* em
-	//    _listeners.
-	// 4. Guarde a lista de Server* daquele grupo em _listenerCandidates,
-	//    no MESMO índice do Socket* correspondente em _listeners --
-	//    assim, quando run() aceitar uma conexão em _listeners[i], já
-	//    sabe passar _listenerCandidates[i] pro Connection novo.
-	//
-	// Cuidado: guardar &_servers[i] só é seguro enquanto _servers não for
-	// mais modificado depois do construtor (nada de push_back depois
-	// daqui, ou os ponteiros ficam inválidos se o vector realocar).
+	for (size_t i = 0; i < _servers.size(); ++i) {
+		const std::vector<Listen>& listens = _servers[i].getListens();
+		for (size_t j = 0; j < listens.size(); ++j) {
+			Socket* listener = new Socket();
+			try {
+				listener->bind(listens[j].host, listens[j].port);
+				listener->listen(10); // REVER QUANTIDADE DEPOIS!!
+				listener->setNonBlocking();
+			} catch (...) {
+				delete listener;
+				throw;
+			}
+			_listeners.push_back(listener); // guarda o Socket* do listener
+			_listenerServers.push_back(&_servers[i]); // guarda o Server* candidato (mesmo índice de _listeners)
+		}
+	}
 }
 
+// montar um std::vector<pollfd> com _listeners + _connections
+// chamar ::poll() UMA vez por volta (nunca ler/escrever sem passar por ele antes)
+// POLLIN num listener -> accept() e criar uma Connection nova (com os candidatos daquele índice)
+// POLLIN numa Connection -> ela lê mais bytes pro próprio buffer
+// POLLOUT numa Connection -> ela manda o que sobrou do buffer de resposta
 void	EventLoop::run() {
-	// TODO: implementar o loop de poll() -- ver os passos no .hpp
+	for (;;) {
+		std::vector<pollfd>	pollfds;
+		pollfds.reserve(_listeners.size() + _connections.size());
+		for (size_t i = 0; i < _listeners.size(); ++i) {
+			pollfd	fd;
+			fd.fd = _listeners[i]->getFd();
+			fd.events = POLLIN;
+			fd.revents = 0;
+			pollfds.push_back(fd);
+		}
+		for (std::map<int, Connection*>::iterator it = _connections.begin(); it != _connections.end(); ++it) {
+			pollfd fd;
+			fd.fd = it->first;
+			fd.events = POLLIN;
+			if (it->second->hasPendingWrite())
+				fd.events |= POLLOUT; // só pede POLLOUT quando há algo pra mandar, senão poll() nunca bloqueia
+			fd.revents = 0;
+			pollfds.push_back(fd);
+		}
+
+		if (pollfds.empty())
+			continue; // não há sockets para monitorar, então não faz sentido chamar poll()
+
+		int returnCode = poll(&pollfds[0], pollfds.size(), -1);
+
+		if (returnCode < 0 ) {
+			if (errno == EINTR)
+				continue ; // poll() interrompido por sinal não é erro
+			throw std::runtime_error("EventLoop: poll failed");
+		} else if (returnCode == 0) {
+			// comparar com o timeout passado e decidir se fecha conexões inativas. (add time-t em con)
+		} else {
+			for (size_t i = 0; i < pollfds.size(); ++i) {
+				if (i < _listeners.size()) {
+					if (pollfds[i].revents & POLLIN) {
+						try {
+							int clientFd = _listeners[i]->accept();
+							Connection* conn = new Connection(clientFd, _listenerServers[i]);
+							_connections[clientFd] = conn;
+						} catch (const std::exception& e) {
+							std::cerr << "EventLoop: accept failed: " << e.what() << "\n";
+						}
+					}
+				} else {
+					if (pollfds[i].revents & POLLIN) {
+						// To do: onReadable() -> recv(). POLLHUP e POLLERR entram aqui
+					}
+					if (pollfds[i].revents & POLLOUT) {
+						// To do: onWritable() -> send().
+					}
+				}
+			}
+		}
+	}
 }

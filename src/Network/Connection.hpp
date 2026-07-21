@@ -15,7 +15,7 @@ class Connection {
 		FileDescriptor				_fd;
 		std::string					_readBuffer;  // bytes recebidos até agora, ainda não processados
 		std::string					_writeBuffer; // resposta pendente de ser enviada
-		const Server*				_candidate;  // Server(s) candidatos deste endpoint (host:port); resolvido de fato pelo header Host: quando a request chegar
+		const Server*				_candidate;  // Server(s) candidatos deste endpoint (host:port);
 
 		Connection(const Connection& other);
 		Connection& operator=(const Connection& other);
@@ -24,7 +24,8 @@ class Connection {
 		Connection(int fd, const Server* candidate);
 		~Connection();
 
-		int	getFd() const;
+		int		getFd() const;
+		bool	hasPendingWrite() const;
 	
 		// TODO: onReadable() -> recv() do que estiver disponível
 		// agora pra _readBuffer; tentar parsear quando já tiver o
