@@ -4,7 +4,6 @@
 #include <vector>
 #include <map>
 #include <string>
-#include "../Config/Server.hpp"
 #include "Socket.hpp"
 #include "Connection.hpp"
 
@@ -13,10 +12,10 @@
 // Network (Socket/Connection), Config nunca inclui nada daqui.
 class EventLoop {
 	private:
-		std::vector<Server>			_servers; // saída de Config::getServers(), copiada uma vez na construção
-		std::vector<Socket*>		_listeners;	// onde ficam os sockets ouvintes
-		std::vector<const Server*>	_listenerServers; // onde ficam os Servers que correspondem a cada listener
-		std::map<int, Connection*>	_connections; // fd -> conexão ativa
+		std::vector<ServerConfig>			_servers; // saída de Config::getServers(), copiada uma vez na construção
+		std::vector<Socket*>				_listeners;	// onde ficam os sockets ouvintes
+		std::vector<const ServerConfig*>	_listenerServers; // onde ficam os Servers que correspondem a cada listener
+		std::map<int, Connection*>			_connections; // fd -> conexão ativa
 
 		EventLoop(const EventLoop& other);
 		EventLoop& operator=(const EventLoop& other);
@@ -32,7 +31,7 @@ class EventLoop {
 		void	reapClosedConnections();
 
 	public:
-		explicit EventLoop(const std::vector<Server>& servers);
+		explicit EventLoop(const std::vector<ServerConfig>& servers);
 		~EventLoop();
 
 		void	run();

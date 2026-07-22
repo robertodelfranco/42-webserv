@@ -1,3 +1,4 @@
+#include "Network/EventLoop.hpp"
 #include "Config/Config.hpp"
 #include <iostream>
 #include <cstdlib>
@@ -18,9 +19,9 @@ int main(int ac, char **av)
 
 	Config config;
 	try {
-		config.load(resolveConfigPath(ac, av));
-		// EventLoop loop(config.getServers());
-		// loop.run();
+		config.init(resolveConfigPath(ac, av));
+		EventLoop	loop(config.getServers());
+		loop.run();
 	}
 	catch (const std::exception& e) {
 		std::cout << e.what() << std::endl;

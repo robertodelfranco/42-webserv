@@ -7,7 +7,7 @@ Config::Config() : servers() {}
 
 Config::~Config() {}
 
-void	Config::load(const char *file) {
+void	Config::init(const char *file) {
 	ConfigLexer	lexer;
 
 	if (!lexer.tokenize(file)) {

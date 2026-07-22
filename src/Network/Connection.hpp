@@ -4,7 +4,7 @@
 #include <string>
 #include <ctime>
 #include "FileDescriptor.hpp"
-#include "../Config/Server.hpp"
+#include "../ServerConfig/ServerConfig.hpp"
 
 // Estado de UM cliente conectado, entre uma chamada de poll() e outra.
 // Como a leitura é non-blocking, a request pode chegar em pedaços ao
@@ -19,7 +19,7 @@ class Connection {
 		FileDescriptor				_fd;
 		std::string					_readBuffer;   // bytes recebidos até agora, ainda não processados
 		std::string					_writeBuffer;  // resposta pendente de ser enviada
-		const Server*				_candidate;    // Server dono deste endpoint (host:port)
+		const ServerConfig*			_candidate;    // Server dono deste endpoint (host:port)
 		std::time_t					_lastActivity; // última vez que recebeu/enviou algo (pro timeout)
 
 		// Único bit de estado que NÃO dá pra derivar dos buffers: se
@@ -38,7 +38,7 @@ class Connection {
 		void	handleRequest();
 
 	public:
-		Connection(int fd, const Server* candidate);
+		Connection(int fd, const ServerConfig* candidate);
 		~Connection();
 
 		int			getFd() const;

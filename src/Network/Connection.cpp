@@ -5,7 +5,7 @@
 // Só guarda o fd (já aceito em outro lugar) e a lista de Server
 // candidatos desse endpoint, nenhuma leitura/escrita acontece aqui.
 // Fd que chega aqui vem cru do accept, por isso setNonBlocking.
-Connection::Connection(int fd, const Server* candidate)
+Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _writeBuffer(), _candidate(candidate),
   _lastActivity(std::time(NULL)), _closeRequested(false) {
 	Socket::setNonBlocking(_fd.get());

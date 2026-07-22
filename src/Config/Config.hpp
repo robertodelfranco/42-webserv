@@ -14,7 +14,7 @@ class Config {
 		Config();
 		~Config();
 
-		void	load(const char *file);
+		void	init(const char *file);
 
 		const std::vector<ServerConfig>&	getServers() const;
 };

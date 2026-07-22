@@ -10,7 +10,7 @@
 /*	style guide google: "if the signature and initializer list are not
 	all on one line, you must wrap before the colon and indent 4 spaces."
 	sim, sou fresco rs... fica muito feio tudo numa linha. (edu) */
-EventLoop::EventLoop(const std::vector<Server>& servers)
+EventLoop::EventLoop(const std::vector<ServerConfig>& servers)
 	: _servers(servers),
 	  _listeners(),
 	  _listenerServers(),
