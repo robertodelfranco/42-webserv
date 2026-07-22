@@ -1,5 +1,7 @@
 #include "Connection.hpp"
 #include "Socket.hpp"
+#include "../Utils/Color.hpp"
+#include "iostream"
 #include <sys/socket.h>
 
 // Só guarda o fd (já aceito em outro lugar) e a lista de Server
@@ -34,6 +36,7 @@ void	Connection::onReadable() {
 	char	buf[4096];
 	ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
 
+	std::cout << Color::YELLOW << "HI" << Color::RESET << std::endl;
 	// n == 0  -> cliente fechou o lado dele (EOF).
 	// n <  0  -> erro. (A norma proíbe olhar errno depois de recv, então
 	//            qualquer retorno <= 0 vira "fecha a conexão" e ponto.)
@@ -55,6 +58,8 @@ void	Connection::onReadable() {
 // aqui sempre há algo no _writeBuffer pra mandar.
 void	Connection::onWritable() {
 	ssize_t	n = send(_fd.get(), _writeBuffer.data(), _writeBuffer.size(), 0);
+
+	std::cout << Color::RED << "BYE" << Color::RESET << std::endl;
 
 	if (n < 0) {
 		_closeRequested = true;

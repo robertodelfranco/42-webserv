@@ -1,4 +1,5 @@
 #include "EventLoop.hpp"
+#include "../Utils/Color.hpp"
 #include <poll.h>
 #include <cerrno>
 #include <stdexcept>
@@ -44,6 +45,7 @@ void	EventLoop::openListeners() {
 			}
 			_listeners.push_back(listener); // guarda o Socket* do listener
 			_listenerServers.push_back(&_servers[i]); // guarda o Server* candidato (mesmo índice de _listeners)
+			std::cout << Color::GREEN << "I'm listening on " << listens[j].host << " " << listens[j].port << Color::RESET << std::endl;
 		}
 	}
 }
