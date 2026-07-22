@@ -98,14 +98,31 @@ void	EventLoop::run() {
 						}
 					}
 				} else {
-					if (pollfds[i].revents & POLLIN) {
-						// To do: onReadable() -> recv(). POLLHUP e POLLERR entram aqui
-					}
-					if (pollfds[i].revents & POLLOUT) {
-						// To do: onWritable() -> send().
-					}
+					Connection* conn = _connections[pollfds[i].fd];
+
+					// POLLHUP/POLLERR/POLLNVAL: o par sumiu ou o fd
+					// invalidou. Deixa o onReadable bater no recv() <= 0 e
+					// marcar o fecho sozinho (POLLNVAL fora daqui viraria
+					// busy-loop, já que poll() o reporta toda volta).
+					if (pollfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))
+						conn->onReadable();
+					if (pollfds[i].revents & POLLOUT && !conn->isClosing())
+						conn->onWritable();
 				}
 			}
+			reapClosedConnections();
+		}
+	}
+}
+
+void	EventLoop::reapClosedConnections() {
+	std::map<int, Connection*>::iterator it = _connections.begin();
+	while (it != _connections.end()) {
+		if (it->second->isClosing()) {
+			delete it->second;        // ~FileDescriptor fecha o fd
+			_connections.erase(it++); // avança ANTES de invalidar o iterador (C++98)
+		} else {
+			++it;
 		}
 	}
 }

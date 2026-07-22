@@ -25,6 +25,12 @@ class EventLoop {
 		// Socket ouvinte por grupo, cada socket representa um endpoint.
 		void	openListeners();
 
+		// Depois de tratar os pollfds, apaga do mapa (e delete, que
+		// fecha o fd) toda Connection que se marcou como isClosing().
+		// Separado do loop de dispatch porque não dá pra apagar do mapa
+		// enquanto ainda estou iterando sobre os pollfds daquela volta.
+		void	reapClosedConnections();
+
 	public:
 		explicit EventLoop(const std::vector<Server>& servers);
 		~EventLoop();
