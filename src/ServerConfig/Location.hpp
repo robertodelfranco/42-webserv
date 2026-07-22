@@ -12,6 +12,8 @@ enum Methods {
 	DELETE = 4
 };
 
+class ServerConfig; // forward declaration pq ServerConfig.hpp já inclui Location.hpp
+
 class Location {
 	public:
 		std::string							path; // caminho padrão do location
@@ -24,6 +26,7 @@ class Location {
 		bool								autoindex; // caso tenha ou não autoindex ligado
 		size_t								allow_methods; // métodos permitidos "unificados" por bit (acesse por "&")
 		long long							client_max_body_size; // caso tenha especificado dentro de location
+		std::string							upload_path; // diretório onde uploads (POST) desse location são salvos
 
 		Location();
 
@@ -35,6 +38,10 @@ class Location {
 		void	setRedirect(const std::string& code, const std::string& url);
 		void	setCgi(const std::string& cgi_extension);
 		void	setCgiPath(const std::string& cgi_path);
+		void	setAutoindex(bool value);
+		void	setUploadPath(const std::string& path);
+
+		void	mergeDefaults(const ServerConfig& server); // preenche root/index/error_page/client_max_body_size com o valor do server, quando o location não declarou o próprio
 };
 
 #endif

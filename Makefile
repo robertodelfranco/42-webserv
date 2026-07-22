@@ -5,15 +5,18 @@ FLAGS	=	-Wall -Werror -Wextra -std=c++98
 SRC_DIR	=	src
 SRCS	=	main.cpp \
 			Config/Config.cpp \
-			Config/Server.cpp \
-			Config/Location.cpp \
-			Config/Listen.cpp \
+			Config/ConfigLexer.cpp \
+			Config/ConfigParser.cpp \
+			Config/ConfigParseError.cpp \
 			Config/Token.cpp \
-			Utils/Utils.cpp \
 			Network/FileDescriptor.cpp \
 			Network/Socket.cpp \
 			Network/Connection.cpp \
 			Network/EventLoop.cpp
+			ServerConfig/ServerConfig.cpp \
+			ServerConfig/Location.cpp \
+			ServerConfig/Listen.cpp \
+			Utils/Utils.cpp
 
 
 MAGENTA	=	\033[1;95m
@@ -25,7 +28,7 @@ NC		=	\033[0m
 
 OBJ_DIR	=	objs
 OBJS	=	$(patsubst %.cpp, $(OBJ_DIR)/%.o, $(SRCS))
-VPATH	=	$(SRC_DIR):Config:Utils:Parser:Network
+VPATH	=	$(SRC_DIR):Config:ServerConfig:Utils:Parser:Network
 
 all:
 	@if $(MAKE) -q ${NAME} 2>/dev/null; then \

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upload — webserv</title>
+<style>
+  :root{
+    --bg: #08060c;
+    --bg-glow: #1a0f2e;
+    --purple: #9b5de5;
+    --purple-dim: #4a2a73;
+    --text: #ece9f2;
+    --muted: #6f6a80;
+    --line: #1c1822;
+    --ok: #3fb950;
+    --err: #f85149;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html, body{ height:100%; }
+
+  body{
+    background:
+      radial-gradient(circle at 50% 20%, var(--bg-glow) 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  body::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(155,93,229,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(155,93,229,0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at 50% 15%, black 0%, transparent 70%);
+    pointer-events:none;
+  }
+
+  header{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:.7rem;
+    padding: 1.2rem 2rem;
+    border-bottom: 1px solid rgba(155,93,229,0.15);
+  }
+
+  .logo{ font-size:1rem; font-weight:700; color: var(--text); }
+  .logo span{ color: var(--purple); }
+
+  .badge{
+    font-size:.68rem;
+    letter-spacing:.05em;
+    color: var(--purple);
+    background: rgba(155,93,229,0.1);
+    border: 1px solid var(--purple-dim);
+    padding: .18rem .55rem;
+    border-radius: 999px;
+  }
+
+  header a{
+    margin-left:auto;
+    color: var(--muted);
+    font-size:.8rem;
+    text-decoration:none;
+  }
+  header a:hover{ color: var(--purple); }
+
+  main{
+    position:relative;
+    flex:1;
+    max-width: 560px;
+    width:100%;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+
+  h1{
+    font-size: 1.5rem;
+    font-weight:700;
+    margin-bottom:.4rem;
+    letter-spacing:-.01em;
+  }
+  h1 em{
+    font-style:normal;
+    background: linear-gradient(135deg, #fff 0%, var(--purple) 120%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+
+  .subtitle{
+    color: var(--muted);
+    font-size:.85rem;
+    margin-bottom: 2.2rem;
+  }
+
+  .drop-zone{
+    border: 1.5px dashed var(--purple-dim);
+    border-radius: 8px;
+    padding: 3rem 2rem;
+    text-align:center;
+    cursor:pointer;
+    transition: border-color .2s ease, background .2s ease;
+    margin-bottom: 1.4rem;
+  }
+  .drop-zone:hover, .drop-zone.drag-over{
+    border-color: var(--purple);
+    background: rgba(155,93,229,0.05);
+  }
+  .drop-zone input{ display:none; }
+
+  .drop-text{
+    color: var(--muted);
+    font-size:.85rem;
+    line-height:1.7;
+  }
+  .drop-text strong{ color: var(--purple); font-weight:600; }
+
+  #file-list{
+    margin-top: 1rem;
+    font-size:.78rem;
+    color: var(--text);
+    text-align:left;
+    display:inline-block;
+  }
+  #file-list div{
+    padding: .15rem 0;
+    color: var(--muted);
+  }
+  #file-list div::before{
+    content: "· ";
+    color: var(--purple);
+  }
+
+  .btn{
+    width:100%;
+    padding: .78rem;
+    background: var(--purple);
+    color: #0c0714;
+    border:none;
+    border-radius:6px;
+    font-family: inherit;
+    font-size:.88rem;
+    font-weight:700;
+    letter-spacing:.02em;
+    cursor:pointer;
+    transition: filter .15s ease;
+  }
+  .btn:hover{ filter:brightness(1.1); }
+  .btn:disabled{
+    background: var(--line);
+    color: var(--muted);
+    cursor:not-allowed;
+  }
+
+  #status{
+    margin-top: 1.2rem;
+    padding: .7rem 1rem;
+    border-radius:6px;
+    font-size:.8rem;
+    display:none;
+  }
+  #status.ok{
+    background: rgba(63,185,80,0.1);
+    border: 1px solid rgba(63,185,80,0.3);
+    color: var(--ok);
+    display:block;
+  }
+  #status.err{
+    background: rgba(248,81,73,0.1);
+    border: 1px solid rgba(248,81,73,0.3);
+    color: var(--err);
+    display:block;
+  }
+
+  footer{
+    position:relative;
+    border-top: 1px solid rgba(155,93,229,0.15);
+    padding: 1rem 2rem;
+    font-size:.72rem;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="logo">web<span>serv</span></div>
+    <span class="badge">POST</span>
+    <span class="badge">multipart/form-data</span>
+    <a href="/">← voltar</a>
+</header>
+
+<main>
+    <h1>Upload de <em>arquivos</em></h1>
+    <p class="subtitle">Selecione ou arraste um ou mais arquivos para enviar ao servidor.</p>
+
+    <form id="upload-form">
+        <div class="drop-zone" id="drop-zone">
+            <input type="file" id="file-input" name="file" multiple>
+            <div class="drop-text">
+                Arraste arquivos aqui ou <strong>clique para selecionar</strong>
+            </div>
+            <div id="file-list"></div>
+        </div>
+
+        <button type="submit" class="btn" id="submit-btn" disabled>Enviar arquivo(s)</button>
+    </form>
+
+    <div id="status"></div>
+</main>
+
+<footer>
+    POST /upload/ — os arquivos são salvos em www/uploads/
+</footer>
+
+<script>
+    const dropZone   = document.getElementById('drop-zone');
+    const fileInput  = document.getElementById('file-input');
+    const fileListEl = document.getElementById('file-list');
+    const submitBtn  = document.getElementById('submit-btn');
+    const statusEl   = document.getElementById('status');
+    const form       = document.getElementById('upload-form');
+
+    function setFiles(fileArray) {
+        fileListEl.innerHTML = '';
+        if (fileArray && fileArray.length) {
+            fileArray.forEach(function(file) {
+                var row = document.createElement('div');
+                row.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+                fileListEl.appendChild(row);
+            });
+        }
+        submitBtn.disabled = !(fileArray && fileArray.length);
+    }
+
+    dropZone.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function() {
+        setFiles(Array.from(fileInput.files));
+    });
+
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', function() {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        var files = e.dataTransfer.files;
+        if (files && files.length) {
+            var dt = new DataTransfer();
+            for (var i = 0; i < files.length; i++) {
+                dt.items.add(files[i]);
+            }
+            fileInput.files = dt.files;
+            setFiles(Array.from(fileInput.files));
+        }
+    });
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var files = Array.from(fileInput.files);
+        if (!files.length) return;
+
+        statusEl.className = '';
+        statusEl.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Enviando...';
+
+        var sendNext = function(index) {
+            if (index >= files.length) {
+                submitBtn.textContent = 'Enviar arquivo(s)';
+                statusEl.className = 'ok';
+                statusEl.textContent = files.length + ' arquivo(s) enviado(s) com sucesso!';
+                fileInput.value = '';
+                setFiles([]);
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append('file', files[index]);
+
+            fetch('/upload/', { method: 'POST', body: formData })
+                .then(function(res) {
+                    if (res.ok) {
+                        sendNext(index + 1);
+                    } else {
+                        return res.text().then(function(t) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Enviar arquivo(s)';
+                            statusEl.className = 'err';
+                            statusEl.textContent = 'Erro ' + res.status + ' ao enviar "' + files[index].name + '": ' + t;
+                        });
+                    }
+                })
+                .catch(function(err) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Enviar arquivo(s)';
+                    statusEl.className = 'err';
+                    statusEl.textContent = 'Falha na conexão ao enviar "' + files[index].name + '": ' + err.message;
+                });
+        };
+
+        sendNext(0);
+    });
+</script>
+
+</body>
+</html>

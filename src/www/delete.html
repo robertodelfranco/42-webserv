@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delete — webserv</title>
+<style>
+  :root{
+    --bg: #08060c;
+    --bg-glow: #1a0f2e;
+    --purple: #9b5de5;
+    --purple-dim: #4a2a73;
+    --text: #ece9f2;
+    --muted: #6f6a80;
+    --line: #1c1822;
+    --ok: #3fb950;
+    --err: #f85149;
+    --err-dim: #7a2323;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html, body{ height:100%; }
+
+  body{
+    background:
+      radial-gradient(circle at 50% 20%, var(--bg-glow) 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  body::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(155,93,229,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(155,93,229,0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at 50% 15%, black 0%, transparent 70%);
+    pointer-events:none;
+  }
+
+  header{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:.7rem;
+    padding: 1.2rem 2rem;
+    border-bottom: 1px solid rgba(155,93,229,0.15);
+  }
+
+  .logo{ font-size:1rem; font-weight:700; color: var(--text); }
+  .logo span{ color: var(--purple); }
+
+  .badge{
+    font-size:.68rem;
+    letter-spacing:.05em;
+    color: var(--err);
+    background: rgba(248,81,73,0.1);
+    border: 1px solid var(--err-dim);
+    padding: .18rem .55rem;
+    border-radius: 999px;
+  }
+
+  header a{
+    margin-left:auto;
+    color: var(--muted);
+    font-size:.8rem;
+    text-decoration:none;
+  }
+  header a:hover{ color: var(--purple); }
+
+  main{
+    position:relative;
+    flex:1;
+    max-width: 620px;
+    width:100%;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+
+  h1{
+    font-size: 1.5rem;
+    font-weight:700;
+    margin-bottom:.4rem;
+    letter-spacing:-.01em;
+  }
+  h1 em{
+    font-style:normal;
+    color: var(--err);
+  }
+
+  .subtitle{
+    color: var(--muted);
+    font-size:.85rem;
+    margin-bottom: 2rem;
+  }
+
+  /* manual input */
+  .input-group{
+    display:flex;
+    gap:.7rem;
+    margin-bottom: 2.2rem;
+  }
+
+  input[type="text"]{
+    flex:1;
+    padding: .7rem 1rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--line);
+    border-radius:6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size:.88rem;
+    outline:none;
+    transition: border-color .2s ease;
+  }
+  input[type="text"]:focus{ border-color: var(--err); }
+  input[type="text"]::placeholder{ color: var(--muted); }
+
+  .btn{
+    padding: .7rem 1.3rem;
+    background: #7a1f1f;
+    color: #fff;
+    border:none;
+    border-radius:6px;
+    font-family: inherit;
+    font-size:.85rem;
+    font-weight:600;
+    cursor:pointer;
+    white-space:nowrap;
+    transition: background .2s ease;
+  }
+  .btn:hover{ background: var(--err); }
+  .btn:disabled{ background: var(--line); color: var(--muted); cursor:not-allowed; }
+
+  /* listing */
+  .list-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom: .8rem;
+  }
+  .list-header h2{
+    font-size:.72rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color: var(--muted);
+    font-weight:600;
+  }
+  .refresh{
+    background:none;
+    border:none;
+    color: var(--purple);
+    font-family: inherit;
+    font-size:.75rem;
+    cursor:pointer;
+    text-decoration:none;
+  }
+  .refresh:hover{ text-decoration:underline; }
+
+  .file-list{
+    border-top: 1px solid var(--line);
+    margin-bottom: 1rem;
+  }
+
+  .file-row{
+    display:flex;
+    align-items:center;
+    gap: .9rem;
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size:.85rem;
+  }
+
+  .file-row .name{
+    color: var(--text);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .file-row .del-btn{
+    margin-left:auto;
+    background:none;
+    border: 1px solid var(--err-dim);
+    color: var(--err);
+    font-family: inherit;
+    font-size:.72rem;
+    padding: .3rem .6rem;
+    border-radius:5px;
+    cursor:pointer;
+    transition: background .15s ease, color .15s ease;
+    flex-shrink:0;
+  }
+  .file-row .del-btn:hover{ background: var(--err); color: #fff; }
+  .file-row .del-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+  .empty, .loading{
+    color: var(--muted);
+    font-size:.82rem;
+    padding: 1rem 0;
+  }
+
+  #status{
+    margin-top: .6rem;
+    padding: .7rem 1rem;
+    border-radius:6px;
+    font-size:.8rem;
+    display:none;
+  }
+  #status.ok{
+    background: rgba(63,185,80,0.1);
+    border: 1px solid rgba(63,185,80,0.3);
+    color: var(--ok);
+    display:block;
+  }
+  #status.err{
+    background: rgba(248,81,73,0.1);
+    border: 1px solid rgba(248,81,73,0.3);
+    color: var(--err);
+    display:block;
+  }
+
+  footer{
+    position:relative;
+    border-top: 1px solid rgba(155,93,229,0.15);
+    padding: 1rem 2rem;
+    font-size:.72rem;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="logo">web<span>serv</span></div>
+    <span class="badge">DELETE</span>
+    <a href="/">← voltar</a>
+</header>
+
+<main>
+    <h1>Deletar <em>arquivo</em></h1>
+    <p class="subtitle">Escolha um arquivo da lista abaixo, ou digite o nome exato para remover manualmente.</p>
+
+    <div class="input-group">
+        <input type="text" id="filename" placeholder="ex: foto.png" autocomplete="off">
+        <button class="btn" id="delete-btn">Deletar</button>
+    </div>
+
+    <div class="list-header">
+        <h2>arquivos em www/uploads/</h2>
+        <button class="refresh" id="refresh-btn">↻ atualizar</button>
+    </div>
+
+    <div class="file-list" id="file-list">
+        <div class="loading">carregando lista...</div>
+    </div>
+
+    <div id="status"></div>
+</main>
+
+<footer>
+    DELETE /upload/&lt;filename&gt; — remove o arquivo de www/uploads/
+</footer>
+
+<script>
+    var input      = document.getElementById('filename');
+    var deleteBtn  = document.getElementById('delete-btn');
+    var statusEl   = document.getElementById('status');
+    var fileListEl = document.getElementById('file-list');
+    var refreshBtn = document.getElementById('refresh-btn');
+
+    function showStatus(kind, text) {
+        statusEl.className = kind;
+        statusEl.textContent = text;
+    }
+
+    function deleteFile(name, rowEl) {
+        if (!name) return;
+
+        statusEl.className = '';
+        statusEl.style.display = 'none';
+
+        var btns = rowEl ? [rowEl.querySelector('.del-btn')] : [];
+        if (!rowEl) btns.push(deleteBtn);
+        btns.forEach(function(b){ if (b) b.disabled = true; });
+
+        fetch('/upload/' + encodeURIComponent(name), { method: 'DELETE' })
+            .then(function(res) {
+                btns.forEach(function(b){ if (b) b.disabled = false; });
+                if (res.ok) {
+                    showStatus('ok', 'Arquivo "' + name + '" deletado com sucesso!');
+                    if (rowEl) rowEl.remove();
+                    input.value = '';
+                    loadFiles();
+                } else if (res.status === 404) {
+                    showStatus('err', 'Arquivo "' + name + '" não encontrado.');
+                } else {
+                    return res.text().then(function(t) {
+                        showStatus('err', 'Erro ' + res.status + ': ' + t);
+                    });
+                }
+            })
+            .catch(function(err) {
+                btns.forEach(function(b){ if (b) b.disabled = false; });
+                showStatus('err', 'Falha na conexão: ' + err.message);
+            });
+    }
+
+    deleteBtn.addEventListener('click', function() {
+        deleteFile(input.value.trim(), null);
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') deleteFile(input.value.trim(), null);
+    });
+
+    function renderFiles(names) {
+        fileListEl.innerHTML = '';
+
+        if (!names.length) {
+            fileListEl.innerHTML = '<div class="empty">nenhum arquivo em www/uploads/</div>';
+            return;
+        }
+
+        names.forEach(function(name) {
+            var row = document.createElement('div');
+            row.className = 'file-row';
+
+            var nameEl = document.createElement('span');
+            nameEl.className = 'name';
+            nameEl.textContent = name;
+
+            var delEl = document.createElement('button');
+            delEl.className = 'del-btn';
+            delEl.type = 'button';
+            delEl.textContent = 'deletar';
+            delEl.addEventListener('click', function() {
+                deleteFile(name, row);
+            });
+
+            row.appendChild(nameEl);
+            row.appendChild(delEl);
+            fileListEl.appendChild(row);
+        });
+    }
+
+    // Busca a listagem em GET /upload/ (autoindex do diretório) e extrai
+    // os nomes de arquivo a partir dos links <a href="..."> retornados.
+    // Ajuste o parser aqui caso o autoindex do servidor gere um formato diferente.
+    function loadFiles() {
+        fileListEl.innerHTML = '<div class="loading">carregando lista...</div>';
+
+        fetch('/upload/', { method: 'GET' })
+            .then(function(res) {
+                if (!res.ok) throw new Error('status ' + res.status);
+                return res.text();
+            })
+            .then(function(html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var links = Array.from(doc.querySelectorAll('a'));
+
+                var names = links
+                    .map(function(a) { return a.getAttribute('href'); })
+                    .filter(function(href) {
+                        return href && href !== '../' && href !== '/' && href.indexOf('..') !== 0;
+                    })
+                    .map(function(href) { return decodeURIComponent(href.replace(/\/$/, '')); });
+
+                renderFiles(names);
+            })
+            .catch(function() {
+                fileListEl.innerHTML = '<div class="empty">não foi possível carregar a listagem — use o campo acima para deletar manualmente.</div>';
+            });
+    }
+
+    refreshBtn.addEventListener('click', loadFiles);
+
+    loadFiles();
+</script>
+
+</body>
+</html>
