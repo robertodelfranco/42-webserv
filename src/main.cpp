@@ -16,7 +16,7 @@ int main(int ac, char **av)
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
 		return 1;
 	}
-
+	// TESTING COMMIT
 	Config config;
 	try {
 		config.init(resolveConfigPath(ac, av));
