@@ -2,29 +2,30 @@
 # define SOCKET_HPP
 
 #include <string>
+#include "FileDescriptor.hpp"
 
-// Wrapper RAII em cima de UM file descriptor de socket. Não sabe nada de
-// HTTP — só bind/listen/accept/non-blocking. Dono único do fd: o destrutor
-// fecha, por isso não é copiável (evita dois Socket fechando o mesmo fd).
+// Wrapper em cima de um FileDescriptor especializado em socket TCP: sabe
+// bind/listen/accept/non-blocking. Não sabe nada de HTTP.
 class Socket {
 	private:
-		int	_fd;
+		FileDescriptor	_fd;
 
 		Socket(const Socket& other);
 		Socket& operator=(const Socket& other);
 
 	public:
-		Socket();                // socket(AF_INET, SOCK_STREAM, 0) + SO_REUSEADDR
-		explicit Socket(int fd); // embrulha um fd já existente (ex.: retorno de accept())
-		~Socket();               // fecha o fd, se ainda estiver aberto
+		Socket();
+		explicit Socket(int fd);
+		~Socket();
 
 		int		getFd() const;
 		void	close();
 
-		void	bind(const std::string& host, unsigned short port);
-		void	listen(int backlog);
-		int		accept() const; // retorna o fd aceito; quem chama decide o que fazer com ele
-		void	setNonBlocking();
+		void		bind(const std::string& host, unsigned short port);
+		void		listen(int backlog);
+		int			accept() const;
+		void		setNonBlocking();
+		static void	setNonBlocking(int fd); // aplica O_NONBLOCK direto num fd cru, sem exigir posse (usado pelo fd vindo de accept())
 };
 
 #endif
