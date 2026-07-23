@@ -96,13 +96,6 @@ void	ServerConfig::setIndexFiles(const std::vector<std::string>& index_pages) {
 	this->index_files.insert(this->index_files.end(), index_pages.begin(), index_pages.end());
 }
 
-void	ServerConfig::setServerNames(const std::vector<std::string>& names) {
-	if (names.empty())
-		throw std::runtime_error("Server name: at least one name is required");
-
-	this->server_names.insert(this->server_names.end(), names.begin(), names.end());
-}
-
 void	ServerConfig::addLocation(const Location& location) {
 	this->locations.push_back(location); // location já chega completo, montado localmente em getLocationBlock
 }
@@ -113,10 +106,6 @@ const std::string&	ServerConfig::getRoot() const {
 
 const std::vector<Listen>&	ServerConfig::getListens() const {
 	return this->listens;
-}
-
-const std::vector<std::string>&	ServerConfig::getServerNames() const {
-	return this->server_names;
 }
 
 const std::vector<std::string>&	ServerConfig::getIndexFiles() const {
