@@ -15,7 +15,6 @@ class ServerConfig {
 	private:
 		std::string						root; // caminho root definido
 		std::vector<Listen>				listens; // portas abertas
-		std::vector<std::string>		server_names; // nomes desse virtual host (Host: header) -- opcional, fora de escopo do subject
 		std::vector<std::string>		index_files; // arquivos html
 		std::map<int, std::string>		error_page; // páginas de erros definidas no config
 		std::vector<Location>			locations; // cada bloco location dentro de server
