@@ -13,6 +13,7 @@ SRCS	=	main.cpp \
 			Network/Socket.cpp \
 			Network/Connection.cpp \
 			Network/EventLoop.cpp \
+			Network/Router.cpp \
 			ServerConfig/ServerConfig.cpp \
 			ServerConfig/Location.cpp \
 			ServerConfig/Listen.cpp \

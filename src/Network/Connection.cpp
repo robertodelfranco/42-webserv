@@ -1,5 +1,6 @@
 #include "Connection.hpp"
 #include "Socket.hpp"
+#include "Router.hpp"
 #include "../Utils/Color.hpp"
 #include "iostream"
 #include <sys/socket.h>
@@ -74,25 +75,30 @@ void	Connection::onWritable() {
 		_state = CLOSED;
 }
 
-// PROVISÓRIO: resposta fixa, só pra fechar o fluxo de bytes de ponta a
-// ponta (curl -> accept -> recv -> send -> close). Connection não sabe
-// HTTP: no futuro, esta função repassa _readBuffer pro parser e recebe a
-// string de resposta pronta, sem que onReadable/onWritable mudem.
 void	Connection::handleRequest() {
-	_writeBuffer =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: 13\r\n"
-		"Connection: close\r\n"
-		"\r\n"
-		"Hello, world\n";
-	_readBuffer.clear();
+
+	const Location* matchedLoc = Router::matchLocation(*_candidate,
+													   _request.getPath());
+ 
+	IRequestHandler* handler = Router::createHandler(*matchedLoc, _request);
+
+	bool isDone = handler->handle(_request, *matchedLoc, *this);
+
+    if (isDone) {
+        _state = WRITING;
+    } else {
+        _state = CGI_RUNNING;
+    }
+
+    delete handler;
 }
 
+
 // getters e setters do estado de processamento do request pelo hanlder.
-Connection::State	Connection::getState() const {
+State	Connection::getState() const {
 	return _state;
 }
 
-void	Connection::setState(Connection::State newState) {
+void	Connection::setState(State newState) {
 	_state = newState;
 }
