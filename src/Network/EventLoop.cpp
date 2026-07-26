@@ -108,7 +108,7 @@ void	EventLoop::run() {
 					// busy-loop, já que poll() o reporta toda volta).
 					if (pollfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))
 						conn->onReadable();
-					if (pollfds[i].revents & POLLOUT && !conn->isClosing())
+					if (pollfds[i].revents & POLLOUT && conn->getState() != CLOSED)
 						conn->onWritable();
 				}
 			}
@@ -120,7 +120,7 @@ void	EventLoop::run() {
 void	EventLoop::reapClosedConnections() {
 	std::map<int, Connection*>::iterator it = _connections.begin();
 	while (it != _connections.end()) {
-		if (it->second->isClosing()) {
+		if (it->second->getState() == CLOSED) {
 			delete it->second;        // ~FileDescriptor fecha o fd
 			_connections.erase(it++); // avança ANTES de invalidar o iterador (C++98)
 		} else {

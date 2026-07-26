@@ -9,7 +9,7 @@
 // Fd que chega aqui vem cru do accept, por isso setNonBlocking.
 Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _writeBuffer(), _candidate(candidate),
-  _lastActivity(std::time(NULL)), _closeRequested(false) {
+  _lastActivity(std::time(NULL)), _state(READING) {
 	Socket::setNonBlocking(_fd.get());
 }
 
@@ -21,10 +21,6 @@ int	Connection::getFd() const {
 
 bool	Connection::hasPendingWrite() const {
 	return !_writeBuffer.empty();
-}
-
-bool	Connection::isClosing() const {
-	return _closeRequested;
 }
 
 std::time_t	Connection::getLastActivity() const {
@@ -41,7 +37,7 @@ void	Connection::onReadable() {
 	// n <  0  -> erro. (A norma proíbe olhar errno depois de recv, então
 	//            qualquer retorno <= 0 vira "fecha a conexão" e ponto.)
 	if (n <= 0) {
-		_closeRequested = true;
+		_state = CLOSED;
 		return;
 	}
 
@@ -62,7 +58,7 @@ void	Connection::onWritable() {
 	std::cout << Color::RED << "BYE" << Color::RESET << std::endl;
 
 	if (n < 0) {
-		_closeRequested = true;
+		_state = CLOSED;
 		return;
 	}
 
@@ -75,7 +71,7 @@ void	Connection::onWritable() {
 	// então encerra. (Aqui é onde, depois, você decide reabrir pra ler
 	// a próxima request no mesmo fd em vez de fechar.)
 	if (_writeBuffer.empty())
-		_closeRequested = true;
+		_state = CLOSED;
 }
 
 // PROVISÓRIO: resposta fixa, só pra fechar o fluxo de bytes de ponta a
@@ -90,4 +86,13 @@ void	Connection::handleRequest() {
 		"\r\n"
 		"Hello, world\n";
 	_readBuffer.clear();
+}
+
+// getters e setters do estado de processamento do request pelo hanlder.
+Connection::State	Connection::getState() const {
+	return _state;
+}
+
+void	Connection::setState(Connection::State newState) {
+	_state = newState;
 }

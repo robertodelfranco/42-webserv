@@ -16,7 +16,10 @@ SRCS	=	main.cpp \
 			ServerConfig/ServerConfig.cpp \
 			ServerConfig/Location.cpp \
 			ServerConfig/Listen.cpp \
-			Utils/Utils.cpp
+			Utils/Utils.cpp \
+			Response/HttpResponse.cpp \
+			Request/HttpRequest.cpp \
+			Request/HttpParser.cpp \
 
 
 MAGENTA	=	\033[1;95m
