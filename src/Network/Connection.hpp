@@ -10,13 +10,24 @@
 
 
 /* ESSE ENUM VAMOS USAR PARA REPRESENTAR O ESTADO DA CONEXÃO. */
-
 enum State {
 	READING,
 	PROCESSING,
 	CGI_RUNNING,
 	WRITING,
 	CLOSED
+};
+
+/* CONTEXTO DO CGI. QUANDO UM HANDLER DE CGI FOR CRIADO, ELE VAI IMEDIATAMENTE
+PREENCHER ESSAS INFORMAÇÕES. ASSIM, O EVENTLOOP PODE ACESSAR OS FDS E GERENCIAR
+SE O PROCESSO DO CGI JÁ TERMINOU -- OU SE DEU TIMEOUT. O CGIHANDLER TOMA UM
+DELETE LOGO DEPOIS DE DISPARAR O NOVO PROCESSO. */
+struct CgiContext {
+	pid_t		pid;
+	int			stdin_fd;
+	int			stdout_fd;
+	size_t		inputSent;
+	std::string	outputBuffer;
 };
 
 // Estado de UM cliente conectado, entre uma chamada de poll() e outra.
