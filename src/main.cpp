@@ -1,3 +1,4 @@
+#include "Network/EventLoop.hpp"
 #include "Config/Config.hpp"
 #include <iostream>
 #include <cstdlib>
@@ -15,12 +16,12 @@ int main(int ac, char **av)
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
 		return 1;
 	}
-
+	// TESTING COMMIT
 	Config config;
 	try {
-		config.load(resolveConfigPath(ac, av));
-		// EventLoop loop(config.getServers());
-		// loop.run();
+		config.init(resolveConfigPath(ac, av));
+		EventLoop	loop(config.getServers());
+		loop.run();
 	}
 	catch (const std::exception& e) {
 		std::cout << e.what() << std::endl;

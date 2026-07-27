@@ -1,7 +1,7 @@
 #ifndef ERROR_RESPONSE_HPP
 #define ERROR_RESPONSE_HPP
 
-#include "../Utils/Utils.hpp"
+#include "Response.hpp"
 
 class ErrorResponse : public Response {
 	public:

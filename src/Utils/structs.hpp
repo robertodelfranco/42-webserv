@@ -21,6 +21,7 @@
 #include "../Response/Response.hpp"
 #include "../Response/ErrorResponse.hpp"
 #include "../Request/HTTPRequest.hpp"
+#include "../ServerConfig/Location.hpp"
 
 #define WHITEBOLD "\033[1;37m"
 #define YELLOW "\033[1;33m"
@@ -28,13 +29,6 @@
 #define CYAN "\033[1;36m"
 #define RED "\033[1;31m"
 #define RESET "\033[0m"
-
-enum Methods
-{
-	GET = 1,
-	POST = 2,
-	DELETE = 4,
-};
 
 enum TokenType {
 	UNKNOWN,
@@ -53,18 +47,6 @@ enum SocketState
 	CLOSED,
 };
 
-enum StatusCode 
-{
-	OK = 200,
-	CREATED = 201,
-	NO_CONTENT = 204,
-	BAD_REQUEST = 400,
-	NOT_FOUND = 404,
-	METHOD_NOT_ALLOWED = 405,
-	PAYLOAD_TOO_LARGE = 413,
-	INTERNAL_SERVER_ERROR = 500,
-};
-
 struct Token {
 	TokenType	type;
 	std::string	value;
@@ -75,20 +57,6 @@ struct Token {
 	Token(TokenType type, const std::string& value, size_t line, size_t col);
 };
 
-struct Listen {
-	std::string		host; // 127.0.0.1 ou 0.0.0.0
-	unsigned short	port; // porta
-
-	Listen();
-	Listen(const std::string& host, int port);
-};
-
-struct Location {
-	std::string					path; // caminho padrão do location
-	std::string					root; // caso algo sobreponha o destino root
-	std::string					index; // for handle with get
-	size_t 						client_max_body_size; //max body
-	std::vector<std::string>	redir; // caso tenha redirect de paginas			
 	bool						autoindex; // caso tenha ou não autoindex ligado
 	size_t						allow_methods; // métodos permitidos "unificados" por bit (acesse por "&")
 	long long					client_max_body__size; // caso tenha especificado dentro de location

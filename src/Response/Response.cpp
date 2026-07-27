@@ -26,6 +26,7 @@ std::string Response::statusMessageCode(int code) const {
 		case CREATED: return "Created";
 		case NO_CONTENT: return "No Content";
 		case BAD_REQUEST: return "Bad Request";
+		case FORBIDDEN: return "Forbidden";
 		case NOT_FOUND: return "Not Found";
 		case METHOD_NOT_ALLOWED: return "Method Not Allowed";
 		case PAYLOAD_TOO_LARGE: return "Payload too Large";
