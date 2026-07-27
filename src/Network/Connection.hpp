@@ -5,6 +5,8 @@
 #include <ctime>
 #include "FileDescriptor.hpp"
 #include "../ServerConfig/ServerConfig.hpp"
+#include "../Request/HttpParser.hpp"
+#include "../Request/HttpRequest.hpp"
 
 // Estado de UM cliente conectado, entre uma chamada de poll() e outra.
 // Como a leitura é non-blocking, a request pode chegar em pedaços ao
@@ -21,6 +23,8 @@ class Connection {
 		std::string					_writeBuffer;  // resposta pendente de ser enviada
 		const ServerConfig*			_candidate;    // Server dono deste endpoint (host:port)
 		std::time_t					_lastActivity; // última vez que recebeu/enviou algo (pro timeout)
+		HttpRequest					_request; // Preciso criar uma única vez para manter os dados após várias chamadas do parser.
+		HttpParser					_parser;
 
 		// Único bit de estado que NÃO dá pra derivar dos buffers: se
 		// está vazio o _writeBuffer, não sei distinguir "acabei, feche"

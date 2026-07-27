@@ -9,7 +9,7 @@
 ServerConfig::ServerConfig() : client_max_body_size(1048576) {} // 1MB, mesmo default do nginx -- server é o topo da cadeia, nunca fica "não configurado"
 
 ServerConfig::ServerConfig(const ServerConfig& other)
-	: root(other.root), listens(other.listens), server_names(other.server_names), index_files(other.index_files),
+	: root(other.root), listens(other.listens), index_files(other.index_files),
 	error_page(other.error_page), locations(other.locations),
 	client_max_body_size(other.client_max_body_size) {}
 
@@ -17,7 +17,6 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
 	if (this != &other) {
 		root = other.root;
 		listens = other.listens;
-		server_names = other.server_names;
 		index_files = other.index_files;
 		error_page = other.error_page;
 		locations = other.locations;

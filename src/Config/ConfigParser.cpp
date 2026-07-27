@@ -7,7 +7,6 @@
 
 ConfigParser::ConfigParser() : handlers(), tokens() {
 	handlers[std::string("listen")] = (DirectiveHandler){&ConfigParser::getListen, SERVER, SIMPLE};
-	handlers[std::string("server_name")] = (DirectiveHandler){&ConfigParser::getServerName, SERVER, SIMPLE};
 	handlers[std::string("client_max_body_size")] = (DirectiveHandler){&ConfigParser::getBodySize, SERVER | LOCATION, SIMPLE};
 	handlers[std::string("root")] = (DirectiveHandler){&ConfigParser::getRoot, SERVER | LOCATION, SIMPLE};
 	handlers[std::string("index")] = (DirectiveHandler){&ConfigParser::getIndexPage, SERVER | LOCATION, SIMPLE};
@@ -65,25 +64,6 @@ void	ConfigParser::getListen(ServerConfig& server, Location* location_pointer, s
 	server.setListen(host, port);
 
 	++it;
-}
-
-void	ConfigParser::getServerName(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
-	(void)location_pointer; // server_name é server-only, contexto já garante location_pointer == NULL
-	++it;
-	if (it->type != STRING)
-		throw ConfigParseError("Invalid server_name argument", it->line, it->col, it->value);
-
-	std::vector<std::string> names;
-	while (it->type == STRING) {
-		std::string value = Utils::trim(it->value);
-		if (value.empty())
-			throw ConfigParseError("Empty server_name value", it->line, it->col, it->value);
-
-		names.push_back(value);
-		++it;
-	}
-
-	server.setServerNames(names);
 }
 
 void	ConfigParser::getBodySize(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
