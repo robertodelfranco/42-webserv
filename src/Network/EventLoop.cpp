@@ -1,9 +1,10 @@
 #include "EventLoop.hpp"
 #include "../Utils/Color.hpp"
-
 #include <cerrno>
 #include <stdexcept>
 #include <iostream>
+
+#define CONNECTION_TIMEOUT 30
 
 // Copia os Server parseados (não deveriam mudar depois disso) e já abre
 // os sockets ouvintes.
@@ -50,9 +51,25 @@ void	EventLoop::openListeners() {
 	}
 }
 
-// montar um std::vector<pollfd> com _listeners + _connections
-// chamar ::poll() UMA vez por volta (nunca ler/escrever sem passar por ele antes)
-// POLLIN num listener -> accept() e criar uma Connection nova (com os candidatos daquele índice)
+int	EventLoop::getPollTimeoutMs() const {
+	if (_connections.empty())
+		return -1;
+	
+	std::time_t	now = std::time(NULL);
+	int	smallestRemaining = CONNECTION_TIMEOUT;
+
+	for (std::map<int, Connection*>::const_iterator it = _connections.begin(); it != _connections.end(); ++it) {
+		int elapsed = static_cast<int>(now - it->second->getLastActivity());
+		int remaining = CONNECTION_TIMEOUT - elapsed;
+
+		if (remaining <= 0 )
+			return 0;
+		if (remaining < smallestRemaining)
+			smallestRemaining = remaining;
+	}
+	return smallestRemaining * 1000;
+}
+
 // POLLIN numa Connection -> ela lê mais bytes pro próprio buffer
 // POLLOUT numa Connection -> ela manda o que sobrou do buffer de resposta
 
@@ -76,22 +93,28 @@ std::vector<pollfd>	EventLoop::buildPollfds() {
 			events |= POLLOUT;
 		pollfds.push_back(makePollfd(it->first, events));
 	}
+	
+	return pollfds;
 }
 
 void	EventLoop::run() {
 	for (;;) {
 		std::vector<pollfd>	pollfds = buildPollfds();
-
+		
 		if (pollfds.empty())
 			continue; // não há sockets para monitorar, então não faz sentido chamar poll()
+	
+		int	timeoutMs = getPollTimeoutMs();
 
-		int returnCode = poll(&pollfds[0], pollfds.size(), -1);
+		int returnCode = poll(&pollfds[0], pollfds.size(), timeoutMs);
 
 		if (returnCode < 0 ) {
 			if (errno == EINTR)
 				continue ; // poll() interrompido por sinal não é erro
 			throw std::runtime_error("EventLoop: poll failed");
 		}
+
+		std::time_t now = std::time(NULL);
 		
 		// comparar com o timeout passado e decidir se fecha conexões inativas. (add time-t em con)
 
@@ -113,10 +136,12 @@ void	EventLoop::run() {
 			// invalidou. Deixa o onReadable bater no recv() <= 0 e
 			// marcar o fecho sozinho (POLLNVAL fora daqui viraria
 			// busy-loop, já que poll() o reporta toda volta).
+			if (now - conn->getLastActivity() >= CONNECTION_TIMEOUT)
+				conn->requestClose();
 			if (pollfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))
-			conn->onReadable();
+				conn->onReadable();
 			if (pollfds[i].revents & POLLOUT && !conn->isClosing())
-			conn->onWritable();
+				conn->onWritable();
 		}
 		reapClosedConnections();
 	}

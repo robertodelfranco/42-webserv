@@ -48,6 +48,7 @@ class Connection {
 		int			getFd() const;
 		bool		hasPendingWrite() const;
 		bool		isClosing() const;         // EventLoop consulta pra decidir o delete
+		void		requestClose();
 		std::time_t	getLastActivity() const;   // EventLoop consulta pro timeout
 
 		void	onReadable();   // recv() do que estiver disponível -> _readBuffer

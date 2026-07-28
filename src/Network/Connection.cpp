@@ -31,6 +31,10 @@ std::time_t	Connection::getLastActivity() const {
 	return _lastActivity;
 }
 
+void	Connection::requestClose() {
+	_closeRequested = true;
+}
+
 // O poll() já garantiu que há algo pra ler quando chega aqui.
 void	Connection::onReadable() {
 	char	buf[4096];

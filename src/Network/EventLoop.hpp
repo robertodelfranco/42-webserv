@@ -29,6 +29,9 @@ class EventLoop {
 		// fecha o fd) toda Connection que se marcou como isClosing().
 		void	reapClosedConnections();
 
+		// Pega o quanto de timeout pro poll
+		int		getPollTimeoutMs() const;
+
 		// Função para montar o pollfd todo
 		std::vector<pollfd>	buildPollfds();
 
