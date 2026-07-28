@@ -41,21 +41,28 @@ void	Connection::onReadable() {
 	int		n = recv(_fd.get(), buf, sizeof(buf), 0);
 
 	std::cout << Color::YELLOW << "HI" << Color::RESET << std::endl;
-	// n == 0  -> cliente fechou o lado dele (EOF).
-	// n <  0  -> erro. (A norma proíbe olhar errno depois de recv, então
-	//            qualquer retorno <= 0 vira "fecha a conexão" e ponto.)
-	if (n <= 0) {
+
+    if (n <= 0) {
 		_closeRequested = true;
 		return;
 	}
 
-	_readBuffer.append(buf, n);
 	_lastActivity = std::time(NULL);
 
-	// Entrega os bytes acumulados. Não olho o conteúdo aqui: é o
-	// handleRequest() que decide o que virou resposta.
-	if (!hasPendingWrite())
-		handleRequest();
+    // HttpParser::Status status = _parser.feed(std::string(buf, n));
+
+    // if (status == HttpParser::INCOMPLETE) {
+    //     return; // espera o próximo onReadable
+    // }
+    // if (status == HttpParser::ERROR) {
+    //     // monta resposta de erro, não chama handleRequest()
+    //     return;
+    // }
+
+    // COMPLETE
+    
+	// handleRequest(_parser.getRequest());
+    // _parser.reset();
 }
 
 // O poll() só devolve POLLOUT quando hasPendingWrite() era true, então
@@ -87,13 +94,7 @@ void	Connection::onWritable() {
 // FINAL: Essa função repassa _readBuffer pro parser e recebe a
 // string de resposta pronta, sem que onReadable/onWritable mudem.
 void	Connection::handleRequest() {
-	try {
-		// HttpParser::Status status = _parser.parse(_readBuffer, _request);
-		_readBuffer.clear();
-
-		// if (status == HttpParser::INCOMPLETE) // Só uma suposição
-			// return; // volta pra onReadable
-		
+	try {	
 		// COMPLETE: monta _writeBuffer usando só os getters de _request
 		// _writeBuffer = buildResponse(_request); 
 	} catch (const std::exception& e) {
