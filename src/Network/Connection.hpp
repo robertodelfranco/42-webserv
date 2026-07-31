@@ -26,11 +26,11 @@ class Connection {
 		HttpRequest					_request; // Preciso criar uma única vez para manter os dados após várias chamadas do parser.
 		HttpParser					_parser;
 
-		// Único bit de estado que NÃO dá pra derivar dos buffers: se
-		// está vazio o _writeBuffer, não sei distinguir "acabei, feche"
-		// de "esperando a próxima request". "Lendo" vs "escrevendo" já
-		// é dito por hasPendingWrite(), então não precisa de enum.
 		bool						_closeRequested;
+		bool						_closeAfterWrite;
+		bool						_readClosed;
+		bool						_writeStarted;
+		bool						_timedOut;
 
 		Connection(const Connection& other);
 		Connection& operator=(const Connection& other);
@@ -40,6 +40,8 @@ class Connection {
 		// interpreta os bytes; quando o parser existir, é só esta linha
 		// que passa o _readBuffer adiante e recebe a resposta pronta.
 		void	handleRequest();
+		void	buildTimeoutResponse();
+		void	buildBadRequestResponse();
 
 	public:
 		Connection(int fd, const ServerConfig* candidate);
@@ -47,8 +49,10 @@ class Connection {
 
 		int			getFd() const;
 		bool		hasPendingWrite() const;
+		bool		wantsRead() const;
 		bool		isClosing() const;         // EventLoop consulta pra decidir o delete
 		void		requestClose();
+		void		onTimeout();
 		std::time_t	getLastActivity() const;   // EventLoop consulta pro timeout
 
 		void	onReadable();   // recv() do que estiver disponível -> _readBuffer
