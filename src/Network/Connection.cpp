@@ -11,6 +11,7 @@
 Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _writeBuffer(), _candidate(candidate),
   _lastActivity(std::time(NULL)), _state(READING) {
+//  _lastActivity(std::time(NULL)), _request(), _parser(), _closeRequested(false) {
 	Socket::setNonBlocking(_fd.get());
 }
 
@@ -31,7 +32,7 @@ std::time_t	Connection::getLastActivity() const {
 // O poll() já garantiu que há algo pra ler quando chega aqui.
 void	Connection::onReadable() {
 	char	buf[4096];
-	ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
+	int		n = recv(_fd.get(), buf, sizeof(buf), 0);
 
 	std::cout << Color::YELLOW << "HI" << Color::RESET << std::endl;
 	// n == 0  -> cliente fechou o lado dele (EOF).
@@ -68,7 +69,7 @@ void	Connection::onWritable() {
 	_writeBuffer.erase(0, n);
 	_lastActivity = std::time(NULL);
 
-	// Esvaziou -> resposta inteira foi enviada. Sem keep-alive ainda,
+	// Esvaziou = resposta inteira foi enviada. Sem keep-alive ainda,
 	// então encerra. (Aqui é onde, depois, você decide reabrir pra ler
 	// a próxima request no mesmo fd em vez de fechar.)
 	if (_writeBuffer.empty())
@@ -101,4 +102,31 @@ State	Connection::getState() const {
 
 void	Connection::setState(State newState) {
 	_state = newState;
+
+// // PROVISÓRIO: resposta fixa, só pra fechar o fluxo de bytes de ponta a
+// // ponta (curl -> accept -> recv -> send -> close).
+// // FINAL: Essa função repassa _readBuffer pro parser e recebe a
+// // string de resposta pronta, sem que onReadable/onWritable mudem.
+// void	Connection::handleRequest() {
+// 	try {
+// 		// HttpParser::Status status = _parser.parse(_readBuffer, _request);
+// 		_readBuffer.clear();
+
+// 		// if (status == HttpParser::INCOMPLETE) // Só uma suposição
+// 			// return; // volta pra onReadable
+		
+// 		// COMPLETE: monta _writeBuffer usando só os getters de _request
+// 		// _writeBuffer = buildResponse(_request); 
+// 	} catch (const std::exception& e) {
+// 		// _writeBuffer = buildErrorResponse(400); // ou o código certo pra cada exceção
+// 		_closeRequested = true;
+// 	}
+// 	_writeBuffer =
+// 		"HTTP/1.1 200 OK\r\n"
+// 		"Content-Length: 13\r\n"
+// 		"Connection: close\r\n"
+// 		"\r\n"
+// 		"Hello, world\n";
+// 	_readBuffer.clear();
+
 }

@@ -30,6 +30,9 @@ struct CgiContext {
 	std::string	outputBuffer;
 };
 
+
+
+
 // Estado de UM cliente conectado, entre uma chamada de poll() e outra.
 // Como a leitura é non-blocking, a request pode chegar em pedaços ao
 // longo de várias voltas do event loop, por isso o buffer de leitura
@@ -45,6 +48,8 @@ class Connection {
 		std::string					_writeBuffer;  // resposta pendente de ser enviada
 		const ServerConfig*			_candidate;    // Server dono deste endpoint (host:port)
 		std::time_t					_lastActivity; // última vez que recebeu/enviou algo (pro timeout)
+		HttpRequest					_request; // Preciso criar uma única vez para manter os dados após várias chamadas do parser.
+		HttpParser					_parser;
 
 		/* o Connection cria o HttpRequest e o HttpResponse. Quem vai preencher
 		o HttpRequest é o HttpParser, e quem vai preencher o HttpResponse vai

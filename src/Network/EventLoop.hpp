@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <poll.h>
 #include "Socket.hpp"
 #include "Connection.hpp"
 
@@ -26,9 +27,10 @@ class EventLoop {
 
 		// Depois de tratar os pollfds, apaga do mapa (e delete, que
 		// fecha o fd) toda Connection que se marcou como isClosing().
-		// Separado do loop de dispatch porque não dá pra apagar do mapa
-		// enquanto ainda estou iterando sobre os pollfds daquela volta.
 		void	reapClosedConnections();
+
+		// Função para montar o pollfd todo
+		std::vector<pollfd>	buildPollfds();
 
 	public:
 		explicit EventLoop(const std::vector<ServerConfig>& servers);
