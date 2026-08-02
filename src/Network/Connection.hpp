@@ -6,6 +6,7 @@
 #include "FileDescriptor.hpp"
 #include "../ServerConfig/ServerConfig.hpp"
 #include "../Request/HttpRequest.hpp"
+#include "../Request/HttpParser.hpp"
 #include "../Response/HttpResponse.hpp"
 
 
@@ -48,7 +49,6 @@ class Connection {
 		std::string					_writeBuffer;  // resposta pendente de ser enviada
 		const ServerConfig*			_candidate;    // Server dono deste endpoint (host:port)
 		std::time_t					_lastActivity; // última vez que recebeu/enviou algo (pro timeout)
-		HttpRequest					_request; // Preciso criar uma única vez para manter os dados após várias chamadas do parser.
 		HttpParser					_parser;
 
 		/* o Connection cria o HttpRequest e o HttpResponse. Quem vai preencher
