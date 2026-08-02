@@ -6,7 +6,7 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/25 16:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2026/07/19 11:44:34 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/07/26 10:09:33 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,8 +40,12 @@
 // =======================
 
 HttpParser::HttpParser() {}
-HttpParser::HttpParser(const HttpParser &other) {}
-HttpParser &HttpParser::operator=(const HttpParser &other) { return *this; }
+HttpParser::HttpParser(const HttpParser &other) {
+	(void)other;
+}
+HttpParser &HttpParser::operator=(const HttpParser &other) { 
+	(void)other;
+	return *this; }
 HttpParser::~HttpParser() {}
 
 // =======================

@@ -91,7 +91,32 @@ void	EventLoop::run() {
 			if (errno == EINTR)
 				continue ; // poll() interrompido por sinal não é erro
 			throw std::runtime_error("EventLoop: poll failed");
-		}
+// 		} else if (returnCode == 0) {
+// 			// comparar com o timeout passado e decidir se fecha conexões inativas. (add time-t em con)
+// 		} else {
+// 			for (size_t i = 0; i < pollfds.size(); ++i) {
+// 				if (i < _listeners.size()) {
+// 					if (pollfds[i].revents & POLLIN) {
+// 						try {
+// 							int clientFd = _listeners[i]->accept();
+// 							Connection* conn = new Connection(clientFd, _listenerServers[i]);
+// 							_connections[clientFd] = conn;
+// 						} catch (const std::exception& e) {
+// 							std::cerr << "EventLoop: accept failed: " << e.what() << "\n";
+// 						}
+// 					}
+// 				} else {
+// 					Connection* conn = _connections[pollfds[i].fd];
+
+// 					// POLLHUP/POLLERR/POLLNVAL: o par sumiu ou o fd
+// 					// invalidou. Deixa o onReadable bater no recv() <= 0 e
+// 					// marcar o fecho sozinho (POLLNVAL fora daqui viraria
+// 					// busy-loop, já que poll() o reporta toda volta).
+// 					if (pollfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))
+// 						conn->onReadable();
+// 					if (pollfds[i].revents & POLLOUT && conn->getState() != CLOSED)
+// 						conn->onWritable();
+//		}
 		
 		// comparar com o timeout passado e decidir se fecha conexões inativas. (add time-t em con)
 
@@ -125,7 +150,7 @@ void	EventLoop::run() {
 void	EventLoop::reapClosedConnections() {
 	std::map<int, Connection*>::iterator it = _connections.begin();
 	while (it != _connections.end()) {
-		if (it->second->isClosing()) {
+		if (it->second->getState() == CLOSED) {
 			delete it->second;        // ~FileDescriptor fecha o fd
 			_connections.erase(it++); // avança ANTES de invalidar o iterador (C++98)
 		} else {

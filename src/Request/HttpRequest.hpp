@@ -6,7 +6,7 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/24 17:26:00 by eduribei          #+#    #+#             */
-/*   Updated: 2026/07/18 20:53:59 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/07/25 17:24:18 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -72,7 +72,7 @@ class HttpRequest
     ██ ▀▀ ██▄█▀ ██ ██ ██ ██ ██▄█▀ ▀███▄  ██     ██ ██ ██ ██ ██ ██    ████   
     ██    ▀█▄▄▄ ▀████ ▀██▀█ ▀█▄▄▄ ▄▄▄█▀  ██     ██ ██ ██ ▀███▀ ▀████ ██ ▀█▄ 
                 ██                                                       
-                ▀▀                                                       
+                ▀▀                                                       */
     /* APAGAR DEPOIS!!! esse aqui é um overload do construtor de HttpRequest
     só para gerar um objeto de HttpRequest com dados mockados para testes. */
     HttpRequest(const std::string &mock);

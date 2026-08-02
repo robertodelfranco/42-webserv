@@ -1,5 +1,6 @@
 #include "Connection.hpp"
 #include "Socket.hpp"
+#include "Router.hpp"
 #include "../Utils/Color.hpp"
 #include "iostream"
 #include <sys/socket.h>
@@ -9,7 +10,8 @@
 // Fd que chega aqui vem cru do accept, por isso setNonBlocking.
 Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _writeBuffer(), _candidate(candidate),
-  _lastActivity(std::time(NULL)), _request(), _parser(), _closeRequested(false) {
+  _lastActivity(std::time(NULL)), _state(READING) {
+//  _lastActivity(std::time(NULL)), _request(), _parser(), _closeRequested(false) {
 	Socket::setNonBlocking(_fd.get());
 }
 
@@ -21,10 +23,6 @@ int	Connection::getFd() const {
 
 bool	Connection::hasPendingWrite() const {
 	return !_writeBuffer.empty();
-}
-
-bool	Connection::isClosing() const {
-	return _closeRequested;
 }
 
 std::time_t	Connection::getLastActivity() const {
@@ -41,7 +39,7 @@ void	Connection::onReadable() {
 	// n <  0  -> erro. (A norma proíbe olhar errno depois de recv, então
 	//            qualquer retorno <= 0 vira "fecha a conexão" e ponto.)
 	if (n <= 0) {
-		_closeRequested = true;
+		_state = CLOSED;
 		return;
 	}
 
@@ -62,7 +60,7 @@ void	Connection::onWritable() {
 	std::cout << Color::RED << "BYE" << Color::RESET << std::endl;
 
 	if (n < 0) {
-		_closeRequested = true;
+		_state = CLOSED;
 		return;
 	}
 
@@ -75,32 +73,60 @@ void	Connection::onWritable() {
 	// então encerra. (Aqui é onde, depois, você decide reabrir pra ler
 	// a próxima request no mesmo fd em vez de fechar.)
 	if (_writeBuffer.empty())
-		_closeRequested = true;
+		_state = CLOSED;
 }
 
-// PROVISÓRIO: resposta fixa, só pra fechar o fluxo de bytes de ponta a
-// ponta (curl -> accept -> recv -> send -> close).
-// FINAL: Essa função repassa _readBuffer pro parser e recebe a
-// string de resposta pronta, sem que onReadable/onWritable mudem.
 void	Connection::handleRequest() {
-	try {
-		// HttpParser::Status status = _parser.parse(_readBuffer, _request);
-		_readBuffer.clear();
 
-		// if (status == HttpParser::INCOMPLETE) // Só uma suposição
-			// return; // volta pra onReadable
+	const Location* matchedLoc = Router::matchLocation(*_candidate,
+													   _request.getPath());
+ 
+	IRequestHandler* handler = Router::createHandler(*matchedLoc, _request);
+
+	bool isDone = handler->handle(_request, *matchedLoc, *this);
+
+    if (isDone) {
+        _state = WRITING;
+    } else {
+        _state = CGI_RUNNING;
+    }
+
+    delete handler;
+}
+
+
+// getters e setters do estado de processamento do request pelo hanlder.
+State	Connection::getState() const {
+	return _state;
+}
+
+void	Connection::setState(State newState) {
+	_state = newState;
+
+// // PROVISÓRIO: resposta fixa, só pra fechar o fluxo de bytes de ponta a
+// // ponta (curl -> accept -> recv -> send -> close).
+// // FINAL: Essa função repassa _readBuffer pro parser e recebe a
+// // string de resposta pronta, sem que onReadable/onWritable mudem.
+// void	Connection::handleRequest() {
+// 	try {
+// 		// HttpParser::Status status = _parser.parse(_readBuffer, _request);
+// 		_readBuffer.clear();
+
+// 		// if (status == HttpParser::INCOMPLETE) // Só uma suposição
+// 			// return; // volta pra onReadable
 		
-		// COMPLETE: monta _writeBuffer usando só os getters de _request
-		// _writeBuffer = buildResponse(_request); 
-	} catch (const std::exception& e) {
-		// _writeBuffer = buildErrorResponse(400); // ou o código certo pra cada exceção
-		_closeRequested = true;
-	}
-	_writeBuffer =
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: 13\r\n"
-		"Connection: close\r\n"
-		"\r\n"
-		"Hello, world\n";
-	_readBuffer.clear();
+// 		// COMPLETE: monta _writeBuffer usando só os getters de _request
+// 		// _writeBuffer = buildResponse(_request); 
+// 	} catch (const std::exception& e) {
+// 		// _writeBuffer = buildErrorResponse(400); // ou o código certo pra cada exceção
+// 		_closeRequested = true;
+// 	}
+// 	_writeBuffer =
+// 		"HTTP/1.1 200 OK\r\n"
+// 		"Content-Length: 13\r\n"
+// 		"Connection: close\r\n"
+// 		"\r\n"
+// 		"Hello, world\n";
+// 	_readBuffer.clear();
+
 }
