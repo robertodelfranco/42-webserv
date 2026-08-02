@@ -30,51 +30,42 @@ std::time_t	Connection::getLastActivity() const {
 }
 
 // O poll() já garantiu que há algo pra ler quando chega aqui.
-void	Connection::onReadable() {
-	char	buf[4096];
-	int		n = recv(_fd.get(), buf, sizeof(buf), 0);
+void Connection::onReadable() {
+    char buf[4096];
+    ssize_t n = recv(_fd.get(), buf, sizeof(buf), 0);
 
-	std::cout << Color::YELLOW << "HI" << Color::RESET << std::endl;
-	// n == 0  -> cliente fechou o lado dele (EOF).
-	// n <  0  -> erro. (A norma proíbe olhar errno depois de recv, então
-	//            qualquer retorno <= 0 vira "fecha a conexão" e ponto.)
-	if (n <= 0) {
-		_state = CLOSED;
-		return;
-	}
+    // Se n <= 0, o cliente desconectou (0) ou deu erro de socket (< 0).
+    // NÃO checamos errno. Apenas fechamos a conexão.
+    if (n <= 0) {
+        _state = CLOSED;
+        return;
+    }
 
-	_readBuffer.append(buf, n);
-	_lastActivity = std::time(NULL);
+    _readBuffer.append(buf, n);
+    _lastActivity = std::time(NULL);
 
-	// Entrega os bytes acumulados. Não olho o conteúdo aqui: é o
-	// handleRequest() que decide o que virou resposta.
-	if (!hasPendingWrite())
-		handleRequest();
+    if (!hasPendingWrite())
+        handleRequest();
 }
 
 // O poll() só devolve POLLOUT quando hasPendingWrite() era true, então
 // aqui sempre há algo no _writeBuffer pra mandar.
-void	Connection::onWritable() {
-	ssize_t	n = send(_fd.get(), _writeBuffer.data(), _writeBuffer.size(), 0);
+void Connection::onWritable() {
+    ssize_t n = send(_fd.get(), _writeBuffer.data(), _writeBuffer.size(), 0);
 
-	std::cout << Color::RED << "BYE" << Color::RESET << std::endl;
+    // Se n < 0, erro no envio. Fechamos sem checar errno.
+    if (n < 0) {
+        _state = CLOSED;
+        return;
+    }
 
-	if (n < 0) {
-		_state = CLOSED;
-		return;
-	}
+    _writeBuffer.erase(0, n);
+    _lastActivity = std::time(NULL);
 
-	// send() non-blocking pode aceitar só parte do buffer: desconta
-	// exatamente o que saiu e deixa o resto pra próxima volta.
-	_writeBuffer.erase(0, n);
-	_lastActivity = std::time(NULL);
-
-	// Esvaziou = resposta inteira foi enviada. Sem keep-alive ainda,
-	// então encerra. (Aqui é onde, depois, você decide reabrir pra ler
-	// a próxima request no mesmo fd em vez de fechar.)
-	if (_writeBuffer.empty())
-		_state = CLOSED;
+    if (_writeBuffer.empty())
+        _state = CLOSED; // (Futuramente adaptaremos para Keep-Alive)
 }
+
 
 void	Connection::handleRequest() {
 
