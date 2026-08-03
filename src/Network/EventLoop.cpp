@@ -1,9 +1,11 @@
 #include "EventLoop.hpp"
 #include "../Utils/Color.hpp"
-
 #include <cerrno>
 #include <stdexcept>
 #include <iostream>
+#include <unistd.h>
+
+#define CONNECTION_TIMEOUT 30
 
 // Copia os Server parseados (não deveriam mudar depois disso) e já abre
 // os sockets ouvintes.
@@ -50,9 +52,25 @@ void	EventLoop::openListeners() {
 	}
 }
 
-// montar um std::vector<pollfd> com _listeners + _connections
-// chamar ::poll() UMA vez por volta (nunca ler/escrever sem passar por ele antes)
-// POLLIN num listener -> accept() e criar uma Connection nova (com os candidatos daquele índice)
+int	EventLoop::getPollTimeoutMs() const {
+	if (_connections.empty())
+		return -1;
+	
+	std::time_t	now = std::time(NULL);
+	int	smallestRemaining = CONNECTION_TIMEOUT;
+
+	for (std::map<int, Connection*>::const_iterator it = _connections.begin(); it != _connections.end(); ++it) {
+		int elapsed = static_cast<int>(now - it->second->getLastActivity());
+		int remaining = CONNECTION_TIMEOUT - elapsed;
+
+		if (remaining <= 0 )
+			return 0;
+		if (remaining < smallestRemaining)
+			smallestRemaining = remaining;
+	}
+	return smallestRemaining * 1000;
+}
+
 // POLLIN numa Connection -> ela lê mais bytes pro próprio buffer
 // POLLOUT numa Connection -> ela manda o que sobrou do buffer de resposta
 
@@ -71,55 +89,86 @@ std::vector<pollfd>	EventLoop::buildPollfds() {
 		pollfds.push_back(makePollfd(_listeners[i]->getFd(), POLLIN));
 	}
 	for (std::map<int, Connection*>::iterator it = _connections.begin(); it != _connections.end(); ++it) {
-		short events = POLLIN;
+		short events = 0;
+		if (it->second->wantsRead())
+			events |= POLLIN;
 		if (it->second->hasPendingWrite())
 			events |= POLLOUT;
 		pollfds.push_back(makePollfd(it->first, events));
 	}
+	
+	return pollfds;
 }
 
 void	EventLoop::run() {
 	for (;;) {
 		std::vector<pollfd>	pollfds = buildPollfds();
-
+		
 		if (pollfds.empty())
 			continue; // não há sockets para monitorar, então não faz sentido chamar poll()
+	
+		int	timeoutMs = getPollTimeoutMs();
 
-		int returnCode = poll(&pollfds[0], pollfds.size(), -1);
+		int returnCode = poll(&pollfds[0], pollfds.size(), timeoutMs);
 
 		if (returnCode < 0 ) {
 			if (errno == EINTR)
 				continue ; // poll() interrompido por sinal não é erro
 			throw std::runtime_error("EventLoop: poll failed");
 		}
-		
-		// comparar com o timeout passado e decidir se fecha conexões inativas. (add time-t em con)
 
-		for (size_t i = 0; i < _listeners.size(); ++i) {
-			if (pollfds[i].revents & POLLIN) {
-				try {
-					int clientFd = _listeners[i]->accept();
-					Connection* conn = new Connection(clientFd, _listenerServers[i]);
-					_connections[clientFd] = conn;
-				} catch (const std::exception& e) {
-					std::cerr << "EventLoop: accept failed: " << e.what() << "\n";
-				}
-			}
-		}
+		std::time_t now = std::time(NULL);
 
-		for (size_t i = _listeners.size(); i < pollfds.size(); ++i) {
-			Connection* conn = _connections[pollfds[i].fd];	
-			// POLLHUP/POLLERR/POLLNVAL: o par sumiu ou o fd
-			// invalidou. Deixa o onReadable bater no recv() <= 0 e
-			// marcar o fecho sozinho (POLLNVAL fora daqui viraria
-			// busy-loop, já que poll() o reporta toda volta).
-			if (pollfds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))
-			conn->onReadable();
-			if (pollfds[i].revents & POLLOUT && !conn->isClosing())
-			conn->onWritable();
-		}
+		for (size_t i = 0; i < _listeners.size(); ++i)
+			if (pollfds[i].revents & POLLIN)
+				acceptReadyListener(i);
+
+		for (size_t i = _listeners.size(); i < pollfds.size(); ++i)
+			handleConnectionEvent(pollfds[i], now);
 		reapClosedConnections();
 	}
+}
+
+void	EventLoop::acceptReadyListener(size_t listenerIndex) {
+	for (;;) {
+		int	clientFd = _listeners[listenerIndex]->accept();
+		if (clientFd >= 0) {
+			try {
+				Connection* conn = new Connection(clientFd, _listenerServers[listenerIndex]);
+				_connections[clientFd] = conn;
+			} catch (const std::exception& e) {
+				::close(clientFd);
+				std::cerr << "EventLoop: failed to create connection: " << e.what() << "\n";
+			}
+			continue;
+		}
+		if (errno == EAGAIN || errno == EWOULDBLOCK)
+			return;
+		if (errno == EINTR)
+			continue;
+		std::cerr << "EventLoop: accept failed\n";
+		return;
+	}
+}
+
+void	EventLoop::handleConnectionEvent(const pollfd& event, std::time_t now) {
+	std::map<int, Connection*>::iterator it = _connections.find(event.fd);
+	if (it == _connections.end())
+		return;
+
+	Connection* conn = it->second;
+	if (event.revents & POLLNVAL) {
+		conn->requestClose();
+		return;
+	}
+	if (now - conn->getLastActivity() >= CONNECTION_TIMEOUT)
+		conn->onTimeout();
+	if (conn->isClosing())
+		return;
+	if ((event.revents & (POLLIN | POLLHUP | POLLERR)) && conn->wantsRead())
+		conn->onReadable();
+	if ((event.revents & POLLOUT) && !conn->isClosing() && conn->hasPendingWrite())
+		conn->onWritable();
 }
 
 void	EventLoop::reapClosedConnections() {

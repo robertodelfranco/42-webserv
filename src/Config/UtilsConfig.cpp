@@ -1,7 +1,7 @@
-#include "Utils.hpp"
+#include "UtilsConfig.hpp"
 #include <cctype>
 
-std::string	Utils::trim(const std::string& str) {
+std::string	UtilsConfig::trim(const std::string& str) {
 	size_t	first = str.find_first_not_of(" \t\n\r\f\v");
 
 	if (first == std::string::npos)
@@ -12,7 +12,7 @@ std::string	Utils::trim(const std::string& str) {
 	return str.substr(first, last - first + 1);
 }
 
-void	Utils::ref_trim(std::string& str) {
+void	UtilsConfig::ref_trim(std::string& str) {
 	size_t	n = str.size();
 	size_t	start = 0;
 
@@ -31,7 +31,7 @@ void	Utils::ref_trim(std::string& str) {
 	str = str.substr(start, end - start + 1);
 }
 
-bool	Utils::has_char(const char *str, char c) {
+bool	UtilsConfig::has_char(const char *str, char c) {
 	if (str == NULL) return false;
 
 	for (const char *p = str; *p != '\0'; ++p)
@@ -40,6 +40,6 @@ bool	Utils::has_char(const char *str, char c) {
 	return false;
 }
 
-bool	Utils::has_char(const std::string& str, char c) {
+bool	UtilsConfig::has_char(const std::string& str, char c) {
 	return (str.find(c) != std::string::npos);
 }

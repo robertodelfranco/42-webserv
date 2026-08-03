@@ -1,6 +1,6 @@
 #include "ConfigLexer.hpp"
 #include "ConfigParseError.hpp"
-#include "../Utils/Utils.hpp"
+#include "UtilsConfig.hpp"
 #include <fstream>
 #include <cctype>
 
@@ -34,7 +34,7 @@ size_t	ConfigLexer::consumeDirective(const std::string& line, size_t count_line,
 	while (col < line.size()) {
 		c = static_cast<unsigned char>(line[col]);
 
-		if (Utils::has_char(" \t{;}", c))
+		if (UtilsConfig::has_char(" \t{;}", c))
 			break ;
 
 		if (c == '\'' || c == '"')
@@ -63,7 +63,7 @@ size_t	ConfigLexer::consumeName(const std::string& line, size_t count_line, size
 	while (col < line.size()) {
 		unsigned char	c = static_cast<unsigned char>(line[col]);
 
-		if (Utils::has_char(" \t{;}", c))
+		if (UtilsConfig::has_char(" \t{;}", c))
 			break ;
 
 		if (c == '\'' || c == '"')
@@ -127,14 +127,14 @@ size_t	ConfigLexer::consumePath(const std::string& line, size_t count_line, size
 	unsigned char	c = static_cast<unsigned char>(line[col]);
 	size_t		start = col;
 
-	if (Utils::has_char(" \t{;}", c))
+	if (UtilsConfig::has_char(" \t{;}", c))
 		return col;
 	++col;
 
 	while (col < line.size()) {
 		c = static_cast<unsigned char>(line[col]);
 
-		if (Utils::has_char(" \t{;}", c))
+		if (UtilsConfig::has_char(" \t{;}", c))
 			break ;
 
 		if (c == '\'' || c == '"')
@@ -158,7 +158,7 @@ size_t	ConfigLexer::consumeSymbol(const std::string& line, size_t count_line, si
 	unsigned char	c = static_cast<unsigned char>(line[col]);
 	size_t		start =	col;
 
-	if (!Utils::has_char("{;}", c))
+	if (!UtilsConfig::has_char("{;}", c))
 		return col;
 	++col;
 
@@ -176,7 +176,7 @@ size_t	ConfigLexer::edgeCase(const std::string& line, size_t count_line, size_t 
 	while (col < line.size()) {
 		unsigned char	c = static_cast<unsigned char>(line[col]);
 
-		if (Utils::has_char(" \t{;}", c))
+		if (UtilsConfig::has_char(" \t{;}", c))
 			break ;
 
 		++col;
@@ -231,7 +231,7 @@ bool	ConfigLexer::tokenize(const char *file) {
 		if (pos != std::string::npos) {
 			line = line.substr(0, pos);
 		}
-		Utils::ref_trim(line);
+		UtilsConfig::ref_trim(line);
 		if (line.length() > 0) {
 			consumeLine(line, count_lines);
 		}

@@ -22,12 +22,17 @@ class EventLoop {
 		EventLoop& operator=(const EventLoop& other);
 
 		// Agrupa _servers por (host,port) único e abre UM
-		// Socket ouvinte por grupo, cada socket representa um endpoint.
+		// Socket ouvinte por listen. Listen repetido é erro de config/startup.
 		void	openListeners();
+		void	acceptReadyListener(size_t listenerIndex);
+		void	handleConnectionEvent(const pollfd& event, std::time_t now);
 
 		// Depois de tratar os pollfds, apaga do mapa (e delete, que
 		// fecha o fd) toda Connection que se marcou como isClosing().
 		void	reapClosedConnections();
+
+		// Pega o quanto de timeout pro poll
+		int		getPollTimeoutMs() const;
 
 		// Função para montar o pollfd todo
 		std::vector<pollfd>	buildPollfds();
