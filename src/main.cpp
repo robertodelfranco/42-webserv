@@ -19,7 +19,7 @@ int main(int ac, char **av)
 	// TESTING COMMIT
 	Config config;
 	try {
-		config.init(resolveConfigPath(ac, av));
+		config.load(resolveConfigPath(ac, av));
 		EventLoop	loop(config.getServers());
 		loop.run();
 	}

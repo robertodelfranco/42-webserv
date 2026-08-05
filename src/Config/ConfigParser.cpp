@@ -1,6 +1,7 @@
 #include "ConfigParser.hpp"
 #include "ConfigParseError.hpp"
 #include "UtilsConfig.hpp"
+#include "../ServerConfig/Location.hpp"
 #include <cctype>
 #include <cstdlib>
 #include <limits>
@@ -324,7 +325,7 @@ void	ConfigParser::getLocationBlock(ServerConfig& server, Location* location_poi
 
 	const std::vector<Location>& existing_locations = server.getLocations();
 	for (size_t i = 0; i < existing_locations.size(); ++i) {
-		if (existing_locations[i].path == location_path)
+		if (existing_locations[i].getPath() == location_path)
 			throw ConfigParseError("Duplicate location path '" + location_path + "'", start->line, start->col, start->value);
 	}
 	++start;
@@ -334,7 +335,7 @@ void	ConfigParser::getLocationBlock(ServerConfig& server, Location* location_poi
 	++start;
 
 	Location	location;
-	location.path = location_path; // seta o path do location
+	location.setPath(location_path); // seta o path do location
 
 	while (start != tokens.end()) {
 		if (start->type == SYMBOL && start->value == "}")

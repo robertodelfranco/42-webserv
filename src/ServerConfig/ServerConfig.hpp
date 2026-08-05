@@ -31,13 +31,11 @@ class ServerConfig {
 		void	setBodySize(long long size);
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
 		void	setIndexFiles(const std::vector<std::string>& index_pages);
-		void	setServerNames(const std::vector<std::string>& names);
 		void	addLocation(const Location& location); // adiciona um location já completo no vetor de locations
 
 		const std::string&					getRoot() const;
 		const std::vector<Listen>&			getListens() const;
-		const std::vector<std::string>&	getServerNames() const;
-		const std::vector<std::string>&	getIndexFiles() const;
+		const std::vector<std::string>&		getIndexFiles() const;
 		const std::map<int, std::string>&	getErrorPages() const;
 		const std::vector<Location>&		getLocations() const;
 		long long							getBodySize() const;

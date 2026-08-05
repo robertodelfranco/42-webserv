@@ -1,5 +1,5 @@
 #include "EventLoop.hpp"
-#include "../Utils/Color.hpp"
+#include "../Config/Color.hpp"
 #include <cerrno>
 #include <stdexcept>
 #include <iostream>
@@ -138,7 +138,7 @@ void	EventLoop::acceptReadyListener(size_t listenerIndex) {
 				_connections[clientFd] = conn;
 			} catch (const std::exception& e) {
 				::close(clientFd);
-				std::cerr << "EventLoop: failed to create connection: " << e.what() << "\n";
+				std::cerr << Color::RED << "EventLoop: failed to create connection: " << e.what() << Color::RESET << std::endl;
 			}
 			continue;
 		}
@@ -146,7 +146,7 @@ void	EventLoop::acceptReadyListener(size_t listenerIndex) {
 			return;
 		if (errno == EINTR)
 			continue;
-		std::cerr << "EventLoop: accept failed\n";
+		std::cerr << Color::RED << "EventLoop: accept failed" << Color::RESET << std::endl;
 		return;
 	}
 }

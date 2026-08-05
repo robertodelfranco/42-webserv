@@ -15,21 +15,23 @@ enum Methods {
 class ServerConfig; // forward declaration pq ServerConfig.hpp já inclui Location.hpp
 
 class Location {
+	private:
+		std::string							path_; // caminho padrão do location
+		std::string							root_; // caso algo sobreponha o destino root
+		std::string							cgi_type_; // caso tenha cgi
+		std::string							cgi_path_; // caminho para o executavel do cgi (pyhton3, Go e etc)
+		std::vector<std::string>			index_files_; // index definido no escopo do location
+		std::map<int, std::string>			error_page_; // páginas de erro definidas no escopo do location
+		std::map<std::string, std::string>	redir_; // caso tenha redirect de paginas
+		bool								autoindex_; // caso tenha ou não autoindex ligado
+		size_t								allow_methods_; // métodos permitidos "unificados" por bit (acesse por "&")
+		long long							client_max_body_size_; // caso tenha especificado dentro de location
+		std::string							upload_path_; // diretório onde uploads (POST) desse location são salvos
+	
 	public:
-		std::string							path; // caminho padrão do location
-		std::string							root; // caso algo sobreponha o destino root
-		std::string							cgi_type; // caso tenha cgi
-		std::string							cgi_path; // caminho para o executavel do cgi (pyhton3, Go e etc)
-		std::vector<std::string>			index_files; // index definido no escopo do location
-		std::map<int, std::string>			error_page; // páginas de erro definidas no escopo do location
-		std::map<std::string, std::string>	redir; // caso tenha redirect de paginas
-		bool								autoindex; // caso tenha ou não autoindex ligado
-		size_t								allow_methods; // métodos permitidos "unificados" por bit (acesse por "&")
-		long long							client_max_body_size; // caso tenha especificado dentro de location
-		std::string							upload_path; // diretório onde uploads (POST) desse location são salvos
-
 		Location();
 
+		void	setPath(const std::string& path);
 		void	setRoot(const std::string& root);
 		void	setBodySize(long long size);
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
@@ -42,6 +44,18 @@ class Location {
 		void	setUploadPath(const std::string& path);
 
 		void	mergeDefaults(const ServerConfig& server); // preenche root/index/error_page/client_max_body_size com o valor do server, quando o location não declarou o próprio
+
+		const std::string&							getPath() const;
+		const std::string& 							getRoot() const;
+		const std::string& 							getCgiType() const;
+		const std::string& 							getCgiPath() const;
+		const std::vector<std::string>&				getIndexFiles() const;
+		const std::map<int, std::string>&			getErrorPages() const;
+		const std::map<std::string, std::string>&	getRedir() const;
+		bool										getAutoIndex() const;
+		size_t										getAllowMethods() const;
+		long long									getClientMaxBodySize() const;
+		const std::string&							getUploadPath() const;
 };
 
 #endif

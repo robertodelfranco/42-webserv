@@ -1,5 +1,4 @@
-#include "../Response/ResponseHandle.hpp"
-#include "../Utils/structs.hpp"
+#include "ResponseHandle.hpp"
 
 namespace {
 	std::string joinPath(const std::string &root, const std::string &path) {

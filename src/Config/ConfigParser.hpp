@@ -38,7 +38,6 @@ class ConfigParser {
 		void							consumeRightBrace(std::vector<Token>::iterator& it);
 		void							getDirective(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it, DirectiveContext context);
 		void							getListen(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
-		void							getServerName(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getBodySize(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getRoot(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getIndexPage(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
