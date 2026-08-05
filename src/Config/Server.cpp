@@ -1,4 +1,4 @@
-#include "Server.hpp"
+#include "ServerConfig.hpp"
 
 Server::Server() : index(0), client_max_body__size(0) {}
 

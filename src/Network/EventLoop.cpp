@@ -45,8 +45,8 @@ void	EventLoop::openListeners() {
 				delete listener;
 				throw;
 			}
-			_listeners.push_back(listener); // guarda o Socket* do listener
-			_listenerServers.push_back(&_servers[i]); // guarda o Server* candidato (mesmo índice de _listeners)
+			_listeners.push_back(listener);
+			_listenerServers.push_back(&_servers[i]);
 			std::cout << Color::GREEN << "I'm listening on " << listens[j].host << " " << listens[j].port << Color::RESET << std::endl;
 		}
 	}
@@ -174,7 +174,7 @@ void	EventLoop::handleConnectionEvent(const pollfd& event, std::time_t now) {
 void	EventLoop::reapClosedConnections() {
 	std::map<int, Connection*>::iterator it = _connections.begin();
 	while (it != _connections.end()) {
-		if (it->second->isClosing()) {
+		if (it->second->getState() == CLOSED) {
 			delete it->second;        // ~FileDescriptor fecha o fd
 			_connections.erase(it++); // avança ANTES de invalidar o iterador (C++98)
 		} else {
@@ -182,40 +182,3 @@ void	EventLoop::reapClosedConnections() {
 		}
 	}
 }
-
-// para evitar if/else
-
-/*
-if (returnCode < 0) {
-	if (errno == EINTR)
-		continue;
-	throw std::runtime_error("EventLoop: poll failed");
-}
-
-for (size_t i = 0; i < pollfds.size(); ++i) {
-	...
-}
-*/
-
-/*
-for (size_t i = 0; i < _listeners.size(); ++i) {
-	if (!(pollfds[i].revents & POLLIN))
-		continue;
-	try {
-		int clientFd = _listeners[i]->accept();
-		Connection* conn = new Connection(clientFd, _listenerServers[i]);
-		_connections[clientFd] = conn;
-	} catch (const std::exception& e) {
-		std::cerr << "EventLoop: accept failed: " << e.what() << "\n";
-	}
-}
-
-for (size_t i = _listeners.size(); i < pollfds.size(); ++i) {
-	if (pollfds[i].revents & POLLIN) {
-		// TODO: onReadable(). POLLHUP e POLLERR entram aqui também
-	}
-	if (pollfds[i].revents & POLLOUT) {
-		// TODO: onWritable()
-	}
-}
-*/
