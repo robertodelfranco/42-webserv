@@ -67,9 +67,6 @@ int	Socket::accept() const {
 
 	int client_fd = ::accept(_fd.get(), reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
 
-	if (client_fd < 0)
-		throw std::runtime_error("Socket: accept failed");
-
 	return client_fd;
 }
 
@@ -78,6 +75,9 @@ void	Socket::setNonBlocking() {
 }
 
 void	Socket::setNonBlocking(int fd) {
-	if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)
+	int	flags = fcntl(fd, F_GETFL, 0);
+	if (flags < 0)
+		throw std::runtime_error("Socket: fcntl(F_GETFL) failed");
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
 		throw std::runtime_error("Socket: fcntl(O_NONBLOCK) failed");
 }

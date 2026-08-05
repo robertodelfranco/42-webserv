@@ -59,7 +59,8 @@ class Connection {
 		eles precisam ter o método clear() para o keep-alive funcionar. (edu) */
 		HttpRequest					_request;      // request JÁ parseada
 		HttpResponse				_response;     // resposta a ser enviada
-		State						_state;
+		State						    _state;
+    bool                _timedOut;
 
 		/* APAGANDO ISSO AQUI, PASSAMOS A USAR O _state PARA DIZER EM QUE FASE
 		ESTÁ O PROCESSAMENTO DO REQUEST PELO HANDLER.
@@ -69,6 +70,10 @@ class Connection {
 		// de "esperando a próxima request". "Lendo" vs "escrevendo" já
 		// é dito por hasPendingWrite(), então não precisa de enum.
 		bool						_closeRequested;
+		bool						_closeAfterWrite;
+		bool						_readClosed;
+		bool						_writeStarted;
+		bool						_timedOut;
 
 		*/
 
@@ -80,6 +85,8 @@ class Connection {
 		// interpreta os bytes; quando o parser existir, é só esta linha
 		// que passa o _readBuffer adiante e recebe a resposta pronta.
 		void	handleRequest();
+		void	buildTimeoutResponse();
+		void	buildBadRequestResponse();
 
 	public:
 		Connection(int fd, const ServerConfig* candidate);
@@ -87,7 +94,10 @@ class Connection {
 
 		int			getFd() const;
 		bool		hasPendingWrite() const;
+		bool		wantsRead() const;
 		bool		isClosing() const;         // EventLoop consulta pra decidir o delete
+		void		requestClose();
+		void		onTimeout();
 		std::time_t	getLastActivity() const;   // EventLoop consulta pro timeout
 
 		void	onReadable();   // recv() do que estiver disponível -> _readBuffer

@@ -1,6 +1,6 @@
 #include "ConfigParser.hpp"
 #include "ConfigParseError.hpp"
-#include "../Utils/Utils.hpp"
+#include "UtilsConfig.hpp"
 #include <cctype>
 #include <cstdlib>
 #include <limits>
@@ -49,7 +49,7 @@ void	ConfigParser::getListen(ServerConfig& server, Location* location_pointer, s
 	if (it->type != STRING)
 		throw ConfigParseError("Invalid listen argument", it->line, it->col, it->value);
 
-	std::string	value = Utils::trim(it->value);
+	std::string	value = UtilsConfig::trim(it->value);
 	std::string	host;
 	std::string	port;
 	size_t		colon = value.rfind(':');
@@ -71,7 +71,7 @@ void	ConfigParser::getBodySize(ServerConfig& server, Location* location_pointer,
 	if (it->type != STRING)
 		throw ConfigParseError("Invalid body size argument", it->line, it->col, it->value);
 
-	std::string	value = Utils::trim(it->value);
+	std::string	value = UtilsConfig::trim(it->value);
 	size_t		multiplier = 1;
 
 	if (value.empty())
@@ -135,7 +135,7 @@ void	ConfigParser::getIndexPage(ServerConfig& server, Location* location_pointer
 
 	std::vector<std::string> index_files;
 	while (it->type == STRING) {
-		std::string value = Utils::trim(it->value);
+		std::string value = UtilsConfig::trim(it->value);
 		if (value.empty())
 			throw ConfigParseError("Empty index page value", it->line, it->col, it->value);
 
@@ -157,7 +157,7 @@ void	ConfigParser::getErrorPages(ServerConfig& server, Location* location_pointe
 	std::vector<int> error_pages;
 
 	while (it->type == STRING) {
-		std::string value = Utils::trim(it->value);
+		std::string value = UtilsConfig::trim(it->value);
 
 		if (value.empty())
 			throw ConfigParseError("Empty error page value", it->line, it->col, it->value);
@@ -199,7 +199,7 @@ void	ConfigParser::getMethods(ServerConfig& server, Location* location_pointer, 
 	std::vector<std::string> methods;
 
 	while (it->type == STRING) {
-		std::string value = Utils::trim(it->value);
+		std::string value = UtilsConfig::trim(it->value);
 		if (value.empty())
 			throw ConfigParseError("Empty method value", it->line, it->col, it->value);
 
@@ -216,7 +216,7 @@ void	ConfigParser::getRedirect(ServerConfig& server, Location* location_pointer,
 	if (it->type != STRING)
 		throw ConfigParseError("Invalid redirect code argument", it->line, it->col, it->value);
 
-	std::string value = Utils::trim(it->value);
+	std::string value = UtilsConfig::trim(it->value);
 	if (value.empty())
 		throw ConfigParseError("Empty redirect code value", it->line, it->col, it->value);
 
@@ -237,7 +237,7 @@ void	ConfigParser::getRedirect(ServerConfig& server, Location* location_pointer,
 	if (it->type != STRING)
 		throw ConfigParseError("Invalid redirect URL argument", it->line, it->col, it->value);
 
-	std::string	redirect_url = Utils::trim(it->value);
+	std::string	redirect_url = UtilsConfig::trim(it->value);
 
 	if (redirect_url.empty())
 		throw ConfigParseError("Empty redirect URL value", it->line, it->col, it->value);
@@ -252,7 +252,7 @@ void	ConfigParser::getCgi(ServerConfig& server, Location* location_pointer, std:
 	if (it->type != PATH)
 		throw ConfigParseError("Invalid CGI type argument", it->line, it->col, it->value);
 
-	std::string cgi_extension = Utils::trim(it->value);
+	std::string cgi_extension = UtilsConfig::trim(it->value);
 
 	if (cgi_extension.empty())
 		throw ConfigParseError("Empty CGI type value", it->line, it->col, it->value);
@@ -270,7 +270,7 @@ void	ConfigParser::getCgiPath(ServerConfig& server, Location* location_pointer, 
 	if (it->type != PATH)
 		throw ConfigParseError("Invalid CGI path argument", it->line, it->col, it->value);
 
-	std::string cgi_path = Utils::trim(it->value);
+	std::string cgi_path = UtilsConfig::trim(it->value);
 
 	if (cgi_path.empty())
 		throw ConfigParseError("Empty CGI path value", it->line, it->col, it->value);
@@ -285,7 +285,7 @@ void	ConfigParser::getAutoindex(ServerConfig& server, Location* location_pointer
 	if (it->type != STRING)
 		throw ConfigParseError("Invalid autoindex argument", it->line, it->col, it->value);
 
-	std::string value = Utils::trim(it->value);
+	std::string value = UtilsConfig::trim(it->value);
 
 	if (value != "on" && value != "off")
 		throw ConfigParseError("Invalid autoindex value '" + value + "' (expected 'on' or 'off')", it->line, it->col, it->value);
@@ -300,7 +300,7 @@ void	ConfigParser::getUploadPath(ServerConfig& server, Location* location_pointe
 	if (it->type != PATH)
 		throw ConfigParseError("Invalid upload path argument", it->line, it->col, it->value);
 
-	std::string path = Utils::trim(it->value);
+	std::string path = UtilsConfig::trim(it->value);
 
 	if (path.empty())
 		throw ConfigParseError("Empty upload path value", it->line, it->col, it->value);
@@ -318,7 +318,7 @@ void	ConfigParser::getLocationBlock(ServerConfig& server, Location* location_poi
 	if (start->type != PATH)
 		throw ConfigParseError("Invalid location path argument", start->line, start->col, start->value);
 
-	std::string location_path = Utils::trim(start->value);
+	std::string location_path = UtilsConfig::trim(start->value);
 	if (location_path.empty())
 		throw ConfigParseError("Empty location path value", start->line, start->col, start->value);
 
