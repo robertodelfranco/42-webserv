@@ -1,7 +1,7 @@
 #include "Connection.hpp"
 #include "Socket.hpp"
 #include "Router.hpp"
-#include "../Utils/Color.hpp"
+#include "../Config/Color.hpp"
 #include "iostream"
 #include <cerrno>
 #include <sys/socket.h>
@@ -15,8 +15,8 @@
 // Fd que chega aqui vem cru do accept, por isso setNonBlocking.
 Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _writeBuffer(), _candidate(candidate),
-  _lastActivity(std::time(NULL)), _state(READING), _request(),
-   _parser(), _timedOut(false) {
+  _lastActivity(std::time(NULL)), _parser(), _request(), _response(),
+  _state(READING) {
 	Socket::setNonBlocking(_fd.get());
 }
 
@@ -27,15 +27,15 @@ int	Connection::getFd() const {
 }
 
 bool	Connection::hasPendingWrite() const {
-	return !_writeBuffer.empty();
+	return _state == WRITING && !_writeBuffer.empty();
 }
 
 bool	Connection::wantsRead() const {
-	return !_closeRequested && !_readClosed && _writeBuffer.empty();
+	return _state == READING;
 }
 
 bool	Connection::isClosing() const {
-	return _closeRequested;
+	return _state == CLOSED;
 }
 
 std::time_t	Connection::getLastActivity() const {
@@ -43,18 +43,17 @@ std::time_t	Connection::getLastActivity() const {
 }
 
 void	Connection::requestClose() {
-	_closeRequested = true;
+	_state = CLOSED;
 }
 
 void	Connection::onTimeout() {
-	_timedOut = true;
-	_readClosed = true;
-	if (_writeStarted || !_writeBuffer.empty()) {
-		_closeRequested = true;
+	if (_state == CLOSED)
+		return;
+	if (_state != READING) {
+		_state = CLOSED;
 		return;
 	}
 	buildTimeoutResponse();
-	_closeAfterWrite = true;
 }
 
 // O poll() garantiu que vale tentar ler. Como o fd é non-blocking,
@@ -81,21 +80,17 @@ void	Connection::onReadable() {
 			// nesta branch: headers completos já fecham o ciclo read->write.
 			if (_readBuffer.find("\r\n\r\n") != std::string::npos) {
 				handleRequest();
-				_closeAfterWrite = true;
 				return;
 			}
 			continue;
 		}
 		if (n == 0) {
-			_readClosed = true;
-			if (_writeBuffer.empty())
-				_closeRequested = true;
+			_state = CLOSED;
 			return;
 		}
 		if (errno == EAGAIN || errno == EWOULDBLOCK)
 			return;
 		buildBadRequestResponse();
-		_closeAfterWrite = true;
 		return;
 	}
 }
@@ -105,19 +100,18 @@ void	Connection::onReadable() {
 void	Connection::onWritable() {
 	while (!_writeBuffer.empty()) {
 		ssize_t	n = send(_fd.get(), _writeBuffer.data(), _writeBuffer.size(), MSG_NOSIGNAL);
-    
-    if (n < 0) {
-        _state = CLOSED;
-        return;
-    }
-    
-    if (n == 0) {
-    		_closeRequested = true;
-        return;
-    }
+
+		if (n < 0) {
+			_state = CLOSED;
+			return;
+		}
+
+		if (n == 0) {
+			_state = CLOSED;
+			return;
+		}
 
 		if (n > 0) {
-			_writeStarted = true;
 			_writeBuffer.erase(0, n);
 			_lastActivity = std::time(NULL);
 		}
@@ -126,12 +120,12 @@ void	Connection::onWritable() {
 	// Esvaziou = resposta inteira foi enviada. Sem keep-alive ainda,
 	// então encerra. (Aqui é onde, depois, você decide reabrir pra ler
 	// a próxima request no mesmo fd em vez de fechar.)
-	if (_closeAfterWrite || _writeBuffer.empty())
-		_closeRequested = true;
+	_state = CLOSED;
 }
 
 
 void	Connection::handleRequest() {
+	_state = PROCESSING;
 	const Location* matchedLoc = Router::matchLocation(*_candidate,
 													   _request.getPath());
  
@@ -139,13 +133,13 @@ void	Connection::handleRequest() {
 
 	bool isDone = handler->handle(_request, *matchedLoc, *this);
 
-    if (isDone) {
-        _state = WRITING;
-    } else {
-        _state = CGI_RUNNING;
-    }
+	if (isDone) {
+		_state = WRITING;
+	} else {
+		_state = CGI_RUNNING;
+	}
 
-    delete handler;
+	delete handler;
 }
 
 
@@ -156,33 +150,6 @@ State	Connection::getState() const {
 
 void	Connection::setState(State newState) {
 	_state = newState;
-
-// // PROVISÓRIO: resposta fixa, só pra fechar o fluxo de bytes de ponta a
-// // ponta (curl -> accept -> recv -> send -> close).
-// // FINAL: Essa função repassa _readBuffer pro parser e recebe a
-// // string de resposta pronta, sem que onReadable/onWritable mudem.
-// void	Connection::handleRequest() {
-// 	try {
-// 		// HttpParser::Status status = _parser.parse(_readBuffer, _request);
-// 		_readBuffer.clear();
-
-// 		// if (status == HttpParser::INCOMPLETE) // Só uma suposição
-// 			// return; // volta pra onReadable
-		
-// 		// COMPLETE: monta _writeBuffer usando só os getters de _request
-// 		// _writeBuffer = buildResponse(_request); 
-// 	} catch (const std::exception& e) {
-// 		// _writeBuffer = buildErrorResponse(400); // ou o código certo pra cada exceção
-// 		_closeRequested = true;
-// 	}
-// 	_writeBuffer =
-// 		"HTTP/1.1 200 OK\r\n"
-// 		"Content-Length: 13\r\n"
-// 		"Connection: close\r\n"
-// 		"\r\n"
-// 		"Hello, world\n";
-// 	_readBuffer.clear();
-
 }
 
 void	Connection::buildTimeoutResponse() {
@@ -192,14 +159,15 @@ void	Connection::buildTimeoutResponse() {
 		"Connection: close\r\n"
 		"\r\n"
 		"408 Request Timeout\n";
+	_state = WRITING;
 }
 
 void	Connection::buildBadRequestResponse() {
-	_readClosed = true;
 	_writeBuffer =
 		"HTTP/1.1 400 Bad Request\r\n"
 		"Content-Length: 16\r\n"
 		"Connection: close\r\n"
 		"\r\n"
 		"400 Bad Request\n";
+	_state = WRITING;
 }

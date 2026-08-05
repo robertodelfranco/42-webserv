@@ -1,6 +1,7 @@
 #include "ConfigParser.hpp"
 #include "ConfigParseError.hpp"
 #include "UtilsConfig.hpp"
+#include "../ServerConfig/Location.hpp"
 #include <cctype>
 #include <cstdlib>
 #include <limits>

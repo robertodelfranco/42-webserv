@@ -59,23 +59,7 @@ class Connection {
 		eles precisam ter o método clear() para o keep-alive funcionar. (edu) */
 		HttpRequest					_request;      // request JÁ parseada
 		HttpResponse				_response;     // resposta a ser enviada
-		State						    _state;
-    bool                _timedOut;
-
-		/* APAGANDO ISSO AQUI, PASSAMOS A USAR O _state PARA DIZER EM QUE FASE
-		ESTÁ O PROCESSAMENTO DO REQUEST PELO HANDLER.
-
-		// Único bit de estado que NÃO dá pra derivar dos buffers: se
-		// está vazio o _writeBuffer, não sei distinguir "acabei, feche"
-		// de "esperando a próxima request". "Lendo" vs "escrevendo" já
-		// é dito por hasPendingWrite(), então não precisa de enum.
-		bool						_closeRequested;
-		bool						_closeAfterWrite;
-		bool						_readClosed;
-		bool						_writeStarted;
-		bool						_timedOut;
-
-		*/
+		State						_state;
 
 		Connection(const Connection& other);
 		Connection& operator=(const Connection& other);

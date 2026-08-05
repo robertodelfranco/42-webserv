@@ -9,6 +9,15 @@ Location::Location() : path_(""), root_(""), cgi_type_(""),
 	autoindex_(false), allow_methods_(GET), client_max_body_size_(-1),
 	upload_path_("") {} // allow_methods começa só com GET -- se ninguém declarar "methods", o location fica só de leitura em vez de bloquear tudo (0) ou liberar POST/DELETE sem ninguém ter pedido
 
+void	Location::setPath(const std::string& path) {
+	if (path.empty())
+		throw std::runtime_error("Location: path is required");
+	if (path[0] != '/')
+		throw std::runtime_error("Location: path must start with '/' '" + path + "'");
+
+	this->path_ = path;
+}
+
 void	Location::setRoot(const std::string& root) {
 	if (root.empty())
 		throw std::runtime_error("Root: path is required");

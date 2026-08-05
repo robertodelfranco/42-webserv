@@ -8,6 +8,7 @@ SRCS	=	main.cpp \
 			Config/ConfigLexer.cpp \
 			Config/ConfigParser.cpp \
 			Config/ConfigParseError.cpp \
+			Config/UtilsConfig.cpp \
 			Config/Token.cpp \
 			Network/FileDescriptor.cpp \
 			Network/Socket.cpp \
@@ -17,7 +18,6 @@ SRCS	=	main.cpp \
 			ServerConfig/ServerConfig.cpp \
 			ServerConfig/Location.cpp \
 			ServerConfig/Listen.cpp \
-			Utils/Utils.cpp \
 			Response/HttpResponse.cpp \
 			Request/HttpRequest.cpp \
 			Request/HttpParser.cpp \
