@@ -2,6 +2,7 @@
 #include "ConfigParseError.hpp"
 #include "UtilsConfig.hpp"
 #include "../ServerConfig/Location.hpp"
+#include <stdexcept>
 #include <cctype>
 #include <cstdlib>
 #include <limits>
@@ -415,6 +416,22 @@ std::vector<Token>::iterator	ConfigParser::getServerBlock(std::vector<Token>::it
 	if (server.getRoot().empty())
 		throw ConfigParseError("Server block must have a 'root' directive", server_line, server_col, std::string());
 
+	checkListenDuplicate(servers, server);
 	servers.push_back(server);
 	return start;
+}
+
+void	ConfigParser::checkListenDuplicate(const std::vector<ServerConfig>& servers, const ServerConfig& newServer) {
+	for (size_t i = 0; i < newServer.getListens().size(); i++) {
+		const std::vector<Listen>& newListens = newServer.getListens();
+		
+		for (std::vector<ServerConfig>::const_iterator it = servers.begin(); it != servers.end(); it++) {
+			const std::vector<Listen>& listens = it->getListens();
+
+			for (size_t j = 0; j < listens.size(); j++) {
+				if (newListens[i].port == listens[j].port && newListens[i].host == listens[j].host)
+					throw std::runtime_error("Duplicated Listen without support for virtual host");
+			}
+		}
+	}
 }

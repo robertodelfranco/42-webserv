@@ -69,17 +69,19 @@ void	Connection::onReadable() {
 		if (n > 0) {
 			_lastActivity = std::time(NULL);
 
+			
 			// Integração final esperada:
 			// HttpParser::Status status = _parser.feed(std::string(buf, n));
 			// INCOMPLETE: continua aguardando bytes.
 			// COMPLETE: handleRequest();
 			// ERROR: buildBadRequestResponse();
+			
 			_readBuffer.append(buf, n);
 
 			// Fallback provisório enquanto a API final do parser não está
 			// nesta branch: headers completos já fecham o ciclo read->write.
 			if (_readBuffer.find("\r\n\r\n") != std::string::npos) {
-				handleRequest();
+				handleRequest(); //segfault está aqui
 				return;
 			}
 			continue;
@@ -88,8 +90,6 @@ void	Connection::onReadable() {
 			_state = CLOSED;
 			return;
 		}
-		if (errno == EAGAIN || errno == EWOULDBLOCK)
-			return;
 		buildBadRequestResponse();
 		return;
 	}
@@ -141,7 +141,6 @@ void	Connection::handleRequest() {
 
 	delete handler;
 }
-
 
 // getters e setters do estado de processamento do request pelo hanlder.
 State	Connection::getState() const {
