@@ -10,6 +10,7 @@ SRCS	=	main.cpp \
 			Config/ConfigParseError.cpp \
 			Config/UtilsConfig.cpp \
 			Config/Token.cpp \
+			Utils/Logger.cpp \
 			Network/FileDescriptor.cpp \
 			Network/Socket.cpp \
 			Network/Connection.cpp \
