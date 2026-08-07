@@ -1,5 +1,6 @@
 #include "Network/EventLoop.hpp"
 #include "Config/Config.hpp"
+#include "Utils/Logger.hpp"
 #include <iostream>
 #include <cstdlib>
 
@@ -12,6 +13,7 @@ static const char*	resolveConfigPath(int ac, char **av)
 
 int main(int ac, char **av)
 {
+	Logger::setLevel(Logger::DEBUG);
 	if (ac > 2) {
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
 		return 1;
@@ -19,12 +21,14 @@ int main(int ac, char **av)
 	// TESTING COMMIT
 	Config config;
 	try {
+		const char* path = resolveConfigPath(ac, av);
+		Logger::info() << "Lendo config: " << path << (ac == 2 ? "" : " config/default.conf");
 		config.load(resolveConfigPath(ac, av));
 		EventLoop	loop(config.getServers());
 		loop.run();
 	}
 	catch (const std::exception& e) {
-		std::cout << e.what() << std::endl;
+		Logger::error() << e.what();
 		return EXIT_FAILURE;
 	}
 

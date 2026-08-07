@@ -1,6 +1,7 @@
+#include "../Utils/Logger.hpp"
 #include "EventLoop.hpp"
-#include "../Config/Color.hpp"
 #include <cerrno>
+#include <string.h>
 #include <stdexcept>
 #include <iostream>
 #include <unistd.h>
@@ -24,6 +25,7 @@ EventLoop::EventLoop(const std::vector<ServerConfig>& servers)
 // Libera os Socket* e Connection* que o próprio EventLoop criou com new
 // (cada um fecha seu fd sozinho, via FileDescriptor, quando é destruído).
 EventLoop::~EventLoop() {
+	Logger::info() << "Encerrando: " << _connections.size() << " conexao(oes) aberta(s)";
 	for (size_t i = 0; i < _listeners.size(); ++i)
 		delete _listeners[i];
 
@@ -42,14 +44,18 @@ void	EventLoop::openListeners() {
 				listener->listen(10); // REVER QUANTIDADE DEPOIS!!
 				listener->setNonBlocking();
 			} catch (...) {
+				Logger::error() << "bind/listen em " << listens[j].host << ":" << listens[j].port << " falhou";
 				delete listener;
 				throw;
 			}
 			_listeners.push_back(listener);
 			_listenerServers.push_back(&_servers[i]);
-			std::cout << Color::GREEN << "I'm listening on " << listens[j].host << " " << listens[j].port << Color::RESET << std::endl;
+			Logger::info() << "Listening on " << listens[j].host << ":" << listens[j].port 
+							<< " (fd " << listener->getFd() << ")";
+
 		}
 	}
+	Logger::info() << "webserv pronto: " << _listeners.size() << " listener(s) ativo(s)";
 }
 
 int	EventLoop::getPollTimeoutMs() const {
@@ -73,7 +79,6 @@ int	EventLoop::getPollTimeoutMs() const {
 
 // POLLIN numa Connection -> ela lê mais bytes pro próprio buffer
 // POLLOUT numa Connection -> ela manda o que sobrou do buffer de resposta
-
 static pollfd	makePollfd(int fd, short events) {
 	pollfd	file;
 	file.fd = fd;
@@ -110,6 +115,8 @@ void	EventLoop::run() {
 		int	timeoutMs = getPollTimeoutMs();
 
 		int returnCode = poll(&pollfds[0], pollfds.size(), timeoutMs);
+		Logger::debug() << "poll(): " << returnCode << " fds prontos de "
+                << pollfds.size() << " (timeout " << timeoutMs << "ms)";
 
 		if (returnCode < 0 ) {
 			if (errno == EINTR)
@@ -136,9 +143,11 @@ void	EventLoop::acceptReadyListener(size_t listenerIndex) {
 			try {
 				Connection* conn = new Connection(clientFd, _listenerServers[listenerIndex]);
 				_connections[clientFd] = conn;
+				Logger::info() << "Nova conexao fd=" << clientFd
+               		<< " no listener " << listenerIndex;
 			} catch (const std::exception& e) {
 				::close(clientFd);
-				std::cerr << Color::RED << "EventLoop: failed to create connection: " << e.what() << Color::RESET << std::endl;
+				Logger::error() << "failed to create connection: " << e.what();
 			}
 			continue;
 		}
@@ -146,7 +155,7 @@ void	EventLoop::acceptReadyListener(size_t listenerIndex) {
 			return;
 		if (errno == EINTR)
 			continue;
-		std::cerr << Color::RED << "EventLoop: accept failed" << Color::RESET << std::endl;
+		Logger::error() << "accept failed: " << strerror(errno);
 		return;
 	}
 }
@@ -175,6 +184,7 @@ void	EventLoop::reapClosedConnections() {
 	std::map<int, Connection*>::iterator it = _connections.begin();
 	while (it != _connections.end()) {
 		if (it->second->getState() == CLOSED) {
+			Logger::debug() << "Fechando fd=" << it->first;
 			delete it->second;        // ~FileDescriptor fecha o fd
 			_connections.erase(it++); // avança ANTES de invalidar o iterador (C++98)
 		} else {

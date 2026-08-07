@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include "../Utils/Logger.hpp"
 
 // Função para construir o socket e configurá-lo.
 static int	createTcpSocket() {
@@ -18,6 +19,7 @@ static int	createTcpSocket() {
 		::close(fd); // ainda não existe FileDescriptor pra fazer isso por nós
 		throw std::runtime_error("Socket: setsockopt(SO_REUSEADDR) failed");
 	}
+	Logger::debug() << "socket() criado fd=" << fd << " (SO_REUSEADDR on)";
 	return fd;
 }
 
@@ -53,12 +55,15 @@ void	Socket::bind(const std::string& host, unsigned short port) {
 		oss << "Socket: bind failed on " << (host.empty() ? "0.0.0.0" : host) << ":" << port;
 		throw std::runtime_error(oss.str());
 	}
+	Logger::debug() << "bind() ok fd=" << _fd.get() << " em "
+                << (host.empty() ? "0.0.0.0" : host) << ":" << port;
 }
 
 void	Socket::listen(int backlog) {
 	if (::listen(_fd.get(), backlog) < 0) {
 		throw std::runtime_error("Socket: listen failed");
 	}
+	Logger::debug() << "listen() ok fd=" << _fd.get() << " backlog=" << backlog;
 }
 
 int	Socket::accept() const {
@@ -72,6 +77,7 @@ int	Socket::accept() const {
 
 void	Socket::setNonBlocking() {
 	setNonBlocking(_fd.get());
+	Logger::debug() << "O_NONBLOCK setado em fd= " << _fd.get();
 }
 
 void	Socket::setNonBlocking(int fd) {

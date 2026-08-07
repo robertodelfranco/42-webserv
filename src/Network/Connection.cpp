@@ -5,6 +5,7 @@
 #include "iostream"
 #include <cerrno>
 #include <sys/socket.h>
+#include "../Utils/Logger.hpp"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -67,6 +68,8 @@ void	Connection::onReadable() {
 		ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
 
 		if (n > 0) {
+			Logger::debug() << "fd=" << _fd.get() << " recv " << n << " bytes (buffer "
+                << _readBuffer.size() << ")";
 			_lastActivity = std::time(NULL);
 
 			
@@ -87,6 +90,7 @@ void	Connection::onReadable() {
 			continue;
 		}
 		if (n == 0) {
+			Logger::debug() << "fd=" << _fd.get() << " EOF do cliente";
 			_state = CLOSED;
 			return;
 		}
@@ -113,6 +117,8 @@ void	Connection::onWritable() {
 
 		if (n > 0) {
 			_writeBuffer.erase(0, n);
+			Logger::debug() << "fd=" << _fd.get() << " send " << n << " bytes, faltam "
+                << _writeBuffer.size();
 			_lastActivity = std::time(NULL);
 		}
 	}
@@ -125,6 +131,7 @@ void	Connection::onWritable() {
 
 
 void	Connection::handleRequest() {
+	Logger::info() << "fd=" << _fd.get() << " " << _request.getMethod() << " " << _request.getPath();
 	_state = PROCESSING;
 	const Location* matchedLoc = Router::matchLocation(*_candidate,
 													   _request.getPath());
