@@ -49,6 +49,7 @@ class ConfigParser {
 		void							getAutoindex(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getUploadPath(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it);
 		void							getLocationBlock(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& start);
+		void							checkListenDuplicate(const std::vector<ServerConfig>& servers, const ServerConfig& newServer);
 
 	public:
 		ConfigParser();
