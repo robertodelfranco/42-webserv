@@ -117,12 +117,24 @@ const std::string&	Logger::levelColor(Level level)
 {
 	switch (level)
 	{
-		case DEBUG:		return (Color::CYAN);
+		case DEBUG:		return (Color::YELLOW);
 		case INFO:		return (Color::GREEN);
-		case WARNING:	return (Color::YELLOW);
+		case WARNING:	return (Color::CYAN);
 		case ERROR:		return (Color::RED);
 		default:		return (Color::RESET);
 	}
+}
+
+void	Logger::blank(Level level)
+{
+	if (!isEnabled(level))
+		return ;
+
+	std::ostream&	out = (level >= WARNING) ? std::cerr : std::cout;
+
+	out << std::endl;
+	if (_file.is_open())
+		_file << std::endl;
 }
 
 void	Logger::log(Level level, const std::string& message)

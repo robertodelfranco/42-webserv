@@ -139,6 +139,7 @@ void	EventLoop::acceptReadyListener(size_t listenerIndex) {
 			try {
 				Connection* conn = new Connection(clientFd, _listenerServers[listenerIndex]);
 				_connections[clientFd] = conn;
+				Logger::blank(Logger::INFO); // abre o bloco desta conexao
 				Logger::info() << "Nova conexao fd=" << clientFd
                		<< " no listener " << listenerIndex;
 			} catch (const std::exception& e) {
@@ -183,6 +184,7 @@ void	EventLoop::reapClosedConnections() {
 			Logger::debug() << "Fechando fd=" << it->first;
 			delete it->second;        // ~FileDescriptor fecha o fd
 			_connections.erase(it++); // avança ANTES de invalidar o iterador (C++98)
+			Logger::blank(Logger::DEBUG); // fecha o bloco desta conexao
 		} else {
 			++it;
 		}

@@ -62,6 +62,7 @@ class Logger {
 
 		static bool		isEnabled(Level level);
 		static void		log(Level level, const std::string& message);
+		static void		blank(Level level); // linha em branco pra separar blocos no terminal
 
 	private:
 		Logger();
