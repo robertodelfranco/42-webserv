@@ -23,6 +23,7 @@ SRCS	=	main.cpp \
 			Response/HttpResponse.cpp \
 			Request/HttpRequest.cpp \
 			Request/HttpParser.cpp \
+			Handlers/CgiHandler.cpp \
 
 
 MAGENTA	=	\033[1;95m
