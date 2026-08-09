@@ -33,7 +33,9 @@ class Connection {
 		std::string			_readBuffer;   // bytes recebidos até agora, ainda não processados
 		size_t				_headersEnd;   // npos enquanto o \r\n\r\n não chegou; depois, índice do 1º byte do body
 		long long			_bodyExpected; // Content-Length anunciado; -1 = ainda desconhecido
+		size_t				_requestEnd;   // fim da request tratada dentro do _readBuffer (o que vier depois já é a próxima)
 		bool				_chunked;      // body veio com Transfer-Encoding: chunked
+		bool				_keepAlive;    // reaproveitar a conexão depois de responder
 		std::string			_writeBuffer;  // resposta pendente de ser enviada
 		size_t				_writeOffset; // marca quantos bytes já foram enviados
 		const ServerConfig*	_candidate;    // Server dono deste endpoint (host:port)
@@ -64,6 +66,9 @@ class Connection {
 		};
 
 		RequestStatus	checkRequestFraming();
+		void			decideKeepAlive();
+		void			processReadBuffer();
+		void			resetForNextRequest();	// limpa o estado da request anterior e volta pra READING
 
 		// Ponto de entrega pro resto do sistema (parser -> resposta).
 		// PROVISÓRIO: hoje só enfileira uma resposta fixa. Connection não

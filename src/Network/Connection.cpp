@@ -61,9 +61,9 @@ static bool	parseContentLength(const std::string& raw, long long& out) {
 // candidatos desse endpoint, nenhuma leitura/escrita acontece aqui.
 Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _headersEnd(std::string::npos), _bodyExpected(-1),
-  _chunked(false), _writeBuffer(), _writeOffset(0), _candidate(candidate),
-  _lastActivity(std::time(NULL)), _parser(), _request(), _response(),
-  _state(READING) {
+  _requestEnd(0), _chunked(false), _keepAlive(false), _writeBuffer(),
+  _writeOffset(0), _candidate(candidate), _lastActivity(std::time(NULL)),
+  _parser(), _request(), _response(), _state(READING) {
 	Socket::setNonBlocking(_fd.get());
 }
 
@@ -120,6 +120,8 @@ Connection::RequestStatus	Connection::checkRequestFraming() {
 		const std::string	headers = _readBuffer.substr(0, _headersEnd);
 		std::string			value;
 
+		decideKeepAlive();
+
 		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked")
 			_chunked = true;
 		else if (findHeader(headers, "content-length", value)) {
@@ -137,17 +139,75 @@ Connection::RequestStatus	Connection::checkRequestFraming() {
 		// Provisóriamente, desmembrar os chunks é trabalho do HttpParser.
 		if (bodySoFar > limit)
 			return REQ_TOO_LARGE;
-		if (_readBuffer.compare(_headersEnd, 5, "0\r\n\r\n") == 0
-			|| _readBuffer.find("\r\n0\r\n\r\n", _headersEnd) != std::string::npos)
+		if (_readBuffer.compare(_headersEnd, 5, "0\r\n\r\n") == 0) {
+			_requestEnd = _headersEnd + 5;
 			return REQ_COMPLETE;
+		}
+		std::string::size_type	last = _readBuffer.find("\r\n0\r\n\r\n", _headersEnd);
+		if (last != std::string::npos) {
+			_requestEnd = last + 7;
+			return REQ_COMPLETE;
+		}
 		return REQ_INCOMPLETE;
 	}
 
 	if (_bodyExpected > limit)
 		return REQ_TOO_LARGE;
-	if (bodySoFar >= _bodyExpected)
+	if (bodySoFar >= _bodyExpected) {
+		// o resetForNextRequest() vai preservar os bytes recebidos a mais
+		_requestEnd = _headersEnd + static_cast<size_t>(_bodyExpected);
 		return REQ_COMPLETE;
+	}
 	return REQ_INCOMPLETE;
+}
+
+void	Connection::decideKeepAlive() {
+	const std::string	value = toLower(_request.getHeader("connection"));
+
+	_keepAlive = _request.getHTTPVersion() != "HTTP/1.0";
+	if (value.find("close") != std::string::npos)
+		_keepAlive = false;
+	else if (value.find("keep-alive") != std::string::npos)
+		_keepAlive = true;
+}
+
+void	Connection::resetForNextRequest() {
+	_readBuffer.erase(0, _requestEnd);
+	_headersEnd = std::string::npos;
+	_bodyExpected = -1;
+	_requestEnd = 0;
+	_chunked = false;
+	_writeBuffer.clear();
+	_writeOffset = 0;
+	_request = HttpRequest();
+	_parser = HttpParser();
+	_lastActivity = std::time(NULL); // nova janela de ociosidade
+	_state = READING;
+
+	Logger::debug() << "fd=" << _fd.get() << " keep-alive: pronto pra proxima ("
+		<< _readBuffer.size() << " bytes ja no buffer)";
+}
+
+void	Connection::processReadBuffer() {
+	// Integração final esperada é _parser.feed(...) no lugar do framing.
+	switch (checkRequestFraming()) {
+		case REQ_INCOMPLETE:
+			break; // volta pro poll() e espera o resto chegar
+		case REQ_COMPLETE:
+			handleRequest();
+			break;
+		case REQ_TOO_LARGE:
+			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
+				<< _candidate->getBodySize() << " bytes";
+			buildErrorResponse(413);
+			break;
+		case REQ_HEADERS_TOO_LARGE:
+			buildErrorResponse(431);
+			break;
+		case REQ_BAD:
+			buildErrorResponse(400);
+			break;
+	}
 }
 
 void	Connection::onReadable() {
@@ -173,25 +233,7 @@ void	Connection::onReadable() {
 	Logger::debug() << "fd=" << _fd.get() << " recv " << n << " bytes (buffer "
 		<< _readBuffer.size() << ")";
 
-	// Integração final esperada é _parser.feed(std::string(buf, n))
-	switch (checkRequestFraming()) {
-		case REQ_INCOMPLETE:
-			break; // volta pro poll() e espera o resto chegar
-		case REQ_COMPLETE:
-			handleRequest();
-			break;
-		case REQ_TOO_LARGE:
-			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
-				<< _candidate->getBodySize() << " bytes";
-			buildErrorResponse(413);
-			break;
-		case REQ_HEADERS_TOO_LARGE:
-			buildErrorResponse(431);
-			break;
-		case REQ_BAD:
-			buildErrorResponse(400);
-			break;
-	}
+	processReadBuffer();
 }
 
 // Mesma regra do recv que só pode ler/enviar vigiado pelo poll()
@@ -210,9 +252,17 @@ void	Connection::onWritable() {
 	Logger::debug() << "fd=" << _fd.get() << " send " << n << " bytes, faltam "
 		<< (_writeBuffer.size() - _writeOffset);
 
-	// Sem keep-alive ainda
-	if (_writeOffset == _writeBuffer.size())
+	if (_writeOffset != _writeBuffer.size())
+		return; // ainda falta resposta pra mandar, o poll() chama de novo
+
+	if (!_keepAlive) {
 		_state = CLOSED;
+		return;
+	}
+
+	resetForNextRequest();
+	if (!_readBuffer.empty())
+		processReadBuffer();
 }
 
 
@@ -248,7 +298,7 @@ void	Connection::handleRequest() {
 		return ;
 	}
 
-	// quando a classe de Response do time existir, aqui vira queueResponse(_response.toString()).
+	// quando a classe de Response existir, aqui vira queueResponse(_response.toString()).
 	if (_writeOffset == _writeBuffer.size())
 		buildErrorResponse(500);
 	else
@@ -289,6 +339,11 @@ static const char*	errorPhrase(int code) {
 // resposta chumbada por enquanto para funcionar os testers e o servidor
 void	Connection::buildErrorResponse(int code) {
 	const std::string	phrase = errorPhrase(code);
+
+	// Erro sempre encerra: sem Content-Length o cliente só sabe que o body
+	// acabou quando a conexão fecha. Quando o ErrorResponse assumir e mandar
+	// o Content-Length, 404 e 500 podem voltar a sobreviver ao keep-alive.
+	_keepAlive = false;
 
 	Logger::info() << "fd=" << _fd.get() << " -> " << phrase;
 	queueResponse("HTTP/1.1 " + phrase + "\r\nConnection: close\r\n\r\n" + phrase + "\n");
