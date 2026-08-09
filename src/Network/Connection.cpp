@@ -120,8 +120,6 @@ Connection::RequestStatus	Connection::checkRequestFraming() {
 		const std::string	headers = _readBuffer.substr(0, _headersEnd);
 		std::string			value;
 
-		decideKeepAlive();
-
 		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked")
 			_chunked = true;
 		else if (findHeader(headers, "content-length", value)) {
@@ -194,6 +192,7 @@ void	Connection::processReadBuffer() {
 		case REQ_INCOMPLETE:
 			break; // volta pro poll() e espera o resto chegar
 		case REQ_COMPLETE:
+			decideKeepAlive();
 			handleRequest();
 			break;
 		case REQ_TOO_LARGE:
@@ -267,17 +266,19 @@ void	Connection::onWritable() {
 
 
 void	Connection::handleRequest() {
-	Logger::info() << "fd=" << _fd.get() << " " << _request.getMethod() << " " << _request.getPath();
+	// Logger::info() << "fd=" << _fd.get() << " " << _request.getMethod() << " " << _request.getPath();
 	_state = PROCESSING;
 	const Location* matchedLoc = Router::matchLocation(*_candidate, _request.getPath());
 
 	if (!matchedLoc) {
+		Logger::debug() << "CAINDO NO !mathedLoc";
 		buildErrorResponse(404);
 		return ;
 	}
 
 	IRequestHandler* handler = Router::createHandler(*matchedLoc, _request);
 	if (!handler) {
+		Logger::debug() << "CAINDO NO !handler";
 		buildErrorResponse(500); // nenhum handler soube tratar
 		return ;
 	}
@@ -340,9 +341,6 @@ static const char*	errorPhrase(int code) {
 void	Connection::buildErrorResponse(int code) {
 	const std::string	phrase = errorPhrase(code);
 
-	// Erro sempre encerra: sem Content-Length o cliente só sabe que o body
-	// acabou quando a conexão fecha. Quando o ErrorResponse assumir e mandar
-	// o Content-Length, 404 e 500 podem voltar a sobreviver ao keep-alive.
 	_keepAlive = false;
 
 	Logger::info() << "fd=" << _fd.get() << " -> " << phrase;
