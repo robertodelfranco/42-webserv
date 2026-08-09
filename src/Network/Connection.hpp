@@ -84,6 +84,7 @@ class Connection {
 		int				getFd() const;
 		bool			hasPendingWrite() const;
 		bool			wantsRead() const;
+		bool			wantsKeepAlive() const;
 		bool			isClosing() const;         // EventLoop consulta pra decidir o delete
 		void			requestClose();
 		void			onTimeout();

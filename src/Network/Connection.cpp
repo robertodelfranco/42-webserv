@@ -46,6 +46,23 @@ static bool	findHeader(const std::string& block, const std::string& name, std::s
 	return false;
 }
 
+static void	parseRequestLineProvisional(const std::string& headers, HttpRequest& req) {
+	size_t	firstLineLen = headers.find("\r\n");
+	std::string	firstLine = headers.substr(0, firstLineLen);
+
+	size_t	firstSpace = firstLine.find(' ');
+	size_t	secondSpace = firstLine.find_last_of(' ');
+
+	std::string	method = firstLine.substr(0, firstSpace);
+	std::string target = firstLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+	std::string version = firstLine.substr(secondSpace + 1);
+
+	size_t	cutInterr = target.find("?");
+	std::string	path = (cutInterr == std::string::npos) ? target : target.substr(0, cutInterr);
+
+	req.setRequestLineProvisional(method, path, version);
+}
+
 static bool	parseContentLength(const std::string& raw, long long& out) {
 	if (raw.empty() || raw.find_first_not_of("0123456789") != std::string::npos)
 		return false;
@@ -81,6 +98,10 @@ bool	Connection::wantsRead() const {
 	return _state == READING;
 }
 
+bool	Connection::wantsKeepAlive() const {
+	return _keepAlive;
+}
+
 bool	Connection::isClosing() const {
 	return _state == CLOSED;
 }
@@ -107,6 +128,7 @@ void	Connection::onTimeout() {
 // Decide se o _readBuffer já contém uma request inteira. É chamada depois de
 // cada recv, depois de achado o fim dos headers, _headersEnd/_bodyExpected 
 // ficam guardados e não recalculamos mais nada.
+// FUNÇÃO PROVISÓRIA
 Connection::RequestStatus	Connection::checkRequestFraming() {
 	if (_headersEnd == std::string::npos) {
 		_headersEnd = _readBuffer.find("\r\n\r\n");
@@ -119,6 +141,8 @@ Connection::RequestStatus	Connection::checkRequestFraming() {
 
 		const std::string	headers = _readBuffer.substr(0, _headersEnd);
 		std::string			value;
+
+		parseRequestLineProvisional(headers, _request);
 
 		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked")
 			_chunked = true;

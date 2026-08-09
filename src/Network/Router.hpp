@@ -40,6 +40,8 @@ class Router
 		esse é o famoso design pattern chamado de factory method */
 		static IRequestHandler* createHandler(const Location& loc,
 											  const HttpRequest& req);
+
+		static std::string resolvePath(const Location& loc, const std::string& uriPath);
 };
 
 #endif
