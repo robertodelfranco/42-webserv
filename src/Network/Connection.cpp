@@ -4,6 +4,7 @@
 #include "../Config/Color.hpp"
 #include "iostream"
 #include <cerrno>
+#include <sstream>
 #include <sys/socket.h>
 #include "../Utils/Logger.hpp"
 
@@ -11,11 +12,56 @@
 # define MSG_NOSIGNAL 0
 #endif
 
+// Mesmo valor que o nginx usa (large_client_header_buffers).
+static const size_t	MAX_HEADER_SIZE = 8192;
+
+/* ========================= framing provisório =========================
+Esses dois helpers e o checkRequestFraming() SAEM DAQUI quando o HttpParser
+tiver um feed(), Connection não deve conhecer de HTTP em nenhum momento (Roberto)
+============================================================================ */
+static bool	findHeader(const std::string& block, const std::string& name, std::string& out) {
+	std::string::size_type	lineStart = block.find("\r\n");
+
+	if (lineStart == std::string::npos)
+		return false;
+	lineStart += 2;
+
+	while (lineStart < block.size()) {
+		std::string::size_type	lineEnd = block.find("\r\n", lineStart);
+		if (lineEnd == std::string::npos)
+			lineEnd = block.size();
+
+		std::string::size_type	colon = block.find(':', lineStart);
+		if (colon != std::string::npos && colon < lineEnd
+			&& toLower(block.substr(lineStart, colon - lineStart)) == name) {
+			std::string				value = block.substr(colon + 1, lineEnd - colon - 1);
+			std::string::size_type	begin = value.find_first_not_of(" \t");
+			std::string::size_type	end = value.find_last_not_of(" \t");
+
+			out = (begin == std::string::npos) ? "" : value.substr(begin, end - begin + 1);
+			return true;
+		}
+		lineStart = lineEnd + 2;
+	}
+	return false;
+}
+
+static bool	parseContentLength(const std::string& raw, long long& out) {
+	if (raw.empty() || raw.find_first_not_of("0123456789") != std::string::npos)
+		return false;
+
+	std::istringstream	iss(raw);
+	iss >> out;
+	return !iss.fail();
+}
+
+/* ======================= fim do framing ========================== */
+
 // Só guarda o fd (já aceito em outro lugar) e a lista de Server
 // candidatos desse endpoint, nenhuma leitura/escrita acontece aqui.
-// Fd que chega aqui vem cru do accept, por isso setNonBlocking.
 Connection::Connection(int fd, const ServerConfig* candidate)
-: _fd(fd), _readBuffer(), _writeBuffer(), _candidate(candidate),
+: _fd(fd), _readBuffer(), _headersEnd(std::string::npos), _bodyExpected(-1),
+  _chunked(false), _writeBuffer(), _writeOffset(0), _candidate(candidate),
   _lastActivity(std::time(NULL)), _parser(), _request(), _response(),
   _state(READING) {
 	Socket::setNonBlocking(_fd.get());
@@ -28,7 +74,7 @@ int	Connection::getFd() const {
 }
 
 bool	Connection::hasPendingWrite() const {
-	return _state == WRITING && !_writeBuffer.empty();
+	return _state == WRITING && _writeOffset < _writeBuffer.size();
 }
 
 bool	Connection::wantsRead() const {
@@ -54,102 +100,161 @@ void	Connection::onTimeout() {
 		_state = CLOSED;
 		return;
 	}
-	buildTimeoutResponse();
+	buildErrorResponse(408);
+	_lastActivity = std::time(NULL);
 }
 
-// O poll() garantiu que vale tentar ler. Como o fd é non-blocking,
-// drenamos tudo que já estiver disponível até EAGAIN/EWOULDBLOCK.
+// Decide se o _readBuffer já contém uma request inteira. É chamada depois de
+// cada recv, depois de achado o fim dos headers, _headersEnd/_bodyExpected 
+// ficam guardados e não recalculamos mais nada.
+Connection::RequestStatus	Connection::checkRequestFraming() {
+	if (_headersEnd == std::string::npos) {
+		_headersEnd = _readBuffer.find("\r\n\r\n");
+		if (_headersEnd == std::string::npos) {
+			if (_readBuffer.size() > MAX_HEADER_SIZE)
+				return REQ_HEADERS_TOO_LARGE;
+			return REQ_INCOMPLETE;
+		}
+		_headersEnd += 4; // agora aponta pro primeiro byte do body
+
+		const std::string	headers = _readBuffer.substr(0, _headersEnd);
+		std::string			value;
+
+		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked")
+			_chunked = true;
+		else if (findHeader(headers, "content-length", value)) {
+			if (!parseContentLength(value, _bodyExpected))
+				return REQ_BAD;
+		}
+		else
+			_bodyExpected = 0; // sem nenhum dos dois headers = sem body (GET, DELETE)
+	}
+
+	const long long	limit = _candidate->getBodySize();
+	const long long	bodySoFar = static_cast<long long>(_readBuffer.size() - _headersEnd);
+
+	if (_chunked) {
+		// Provisóriamente, desmembrar os chunks é trabalho do HttpParser.
+		if (bodySoFar > limit)
+			return REQ_TOO_LARGE;
+		if (_readBuffer.compare(_headersEnd, 5, "0\r\n\r\n") == 0
+			|| _readBuffer.find("\r\n0\r\n\r\n", _headersEnd) != std::string::npos)
+			return REQ_COMPLETE;
+		return REQ_INCOMPLETE;
+	}
+
+	if (_bodyExpected > limit)
+		return REQ_TOO_LARGE;
+	if (bodySoFar >= _bodyExpected)
+		return REQ_COMPLETE;
+	return REQ_INCOMPLETE;
+}
+
 void	Connection::onReadable() {
 	if (!wantsRead())
 		return;
 
 	char	buf[4096];
-	for (;;) {
-		ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
+	ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
 
-		if (n > 0) {
-			Logger::debug() << "fd=" << _fd.get() << " recv " << n << " bytes (buffer "
-                << _readBuffer.size() << ")";
-			_lastActivity = std::time(NULL);
-
-			
-			// Integração final esperada:
-			// HttpParser::Status status = _parser.feed(std::string(buf, n));
-			// INCOMPLETE: continua aguardando bytes.
-			// COMPLETE: handleRequest();
-			// ERROR: buildBadRequestResponse();
-			
-			_readBuffer.append(buf, n);
-
-			// Fallback provisório enquanto a API final do parser não está
-			// nesta branch: headers completos já fecham o ciclo read->write.
-			if (_readBuffer.find("\r\n\r\n") != std::string::npos) {
-				handleRequest(); //segfault está aqui
-				return;
-			}
-			continue;
-		}
-		if (n == 0) {
-			Logger::debug() << "fd=" << _fd.get() << " EOF do cliente";
-			_state = CLOSED;
-			return;
-		}
-		buildBadRequestResponse();
+	if (n < 0) {
+		Logger::debug() << "fd=" << _fd.get() << " recv falhou, encerrando";
+		_state = CLOSED;
 		return;
+	}
+	if (n == 0) {
+		Logger::debug() << "fd=" << _fd.get() << " EOF do cliente";
+		_state = CLOSED;
+		return;
+	}
+
+	_lastActivity = std::time(NULL);
+	_readBuffer.append(buf, n);
+	Logger::debug() << "fd=" << _fd.get() << " recv " << n << " bytes (buffer "
+		<< _readBuffer.size() << ")";
+
+	// Integração final esperada é _parser.feed(std::string(buf, n))
+	switch (checkRequestFraming()) {
+		case REQ_INCOMPLETE:
+			break; // volta pro poll() e espera o resto chegar
+		case REQ_COMPLETE:
+			handleRequest();
+			break;
+		case REQ_TOO_LARGE:
+			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
+				<< _candidate->getBodySize() << " bytes";
+			buildErrorResponse(413);
+			break;
+		case REQ_HEADERS_TOO_LARGE:
+			buildErrorResponse(431);
+			break;
+		case REQ_BAD:
+			buildErrorResponse(400);
+			break;
 	}
 }
 
-// O poll() só devolve POLLOUT quando hasPendingWrite() era true, então
-// aqui sempre há algo no _writeBuffer pra mandar.
+// Mesma regra do recv que só pode ler/enviar vigiado pelo poll()
 void	Connection::onWritable() {
-	while (!_writeBuffer.empty()) {
-		ssize_t	n = send(_fd.get(), _writeBuffer.data(), _writeBuffer.size(), MSG_NOSIGNAL);
+	ssize_t	n = send(_fd.get(), _writeBuffer.data() + _writeOffset,
+					 _writeBuffer.size() - _writeOffset, MSG_NOSIGNAL);
 
-		if (n < 0) {
-			_state = CLOSED;
-			return;
-		}
-
-		if (n == 0) {
-			_state = CLOSED;
-			return;
-		}
-
-		if (n > 0) {
-			_writeBuffer.erase(0, n);
-			Logger::debug() << "fd=" << _fd.get() << " send " << n << " bytes, faltam "
-                << _writeBuffer.size();
-			_lastActivity = std::time(NULL);
-		}
+	if (n <= 0) {
+		Logger::debug() << "fd=" << _fd.get() << " send falhou, encerrando";
+		_state = CLOSED;
+		return;
 	}
 
-	// Esvaziou = resposta inteira foi enviada. Sem keep-alive ainda,
-	// então encerra. (Aqui é onde, depois, você decide reabrir pra ler
-	// a próxima request no mesmo fd em vez de fechar.)
-	_state = CLOSED;
+	_writeOffset += static_cast<size_t>(n);
+	_lastActivity = std::time(NULL);
+	Logger::debug() << "fd=" << _fd.get() << " send " << n << " bytes, faltam "
+		<< (_writeBuffer.size() - _writeOffset);
+
+	// Sem keep-alive ainda
+	if (_writeOffset == _writeBuffer.size())
+		_state = CLOSED;
 }
 
 
 void	Connection::handleRequest() {
 	Logger::info() << "fd=" << _fd.get() << " " << _request.getMethod() << " " << _request.getPath();
 	_state = PROCESSING;
-	const Location* matchedLoc = Router::matchLocation(*_candidate,
-													   _request.getPath());
- 
-	IRequestHandler* handler = Router::createHandler(*matchedLoc, _request);
+	const Location* matchedLoc = Router::matchLocation(*_candidate, _request.getPath());
 
-	bool isDone = handler->handle(_request, *matchedLoc, *this);
-
-	if (isDone) {
-		_state = WRITING;
-	} else {
-		_state = CGI_RUNNING;
+	if (!matchedLoc) {
+		buildErrorResponse(404);
+		return ;
 	}
 
+	IRequestHandler* handler = Router::createHandler(*matchedLoc, _request);
+	if (!handler) {
+		buildErrorResponse(500); // nenhum handler soube tratar
+		return ;
+	}
+
+	bool isDone = false;
+	try {
+		isDone = handler->handle(_request, *matchedLoc, *this);
+	} catch (const std::exception& e) {
+		Logger::error() << "fd=" << _fd.get() << " handler lançou: " << e.what();
+		delete handler;
+		buildErrorResponse(500);
+		return ;
+	}
 	delete handler;
+
+	if (!isDone) {
+		_state = CGI_RUNNING;
+		return ;
+	}
+
+	// quando a classe de Response do time existir, aqui vira queueResponse(_response.toString()).
+	if (_writeOffset == _writeBuffer.size())
+		buildErrorResponse(500);
+	else
+		_state = WRITING;
 }
 
-// getters e setters do estado de processamento do request pelo hanlder.
 State	Connection::getState() const {
 	return _state;
 }
@@ -158,22 +263,33 @@ void	Connection::setState(State newState) {
 	_state = newState;
 }
 
-void	Connection::buildTimeoutResponse() {
-	_writeBuffer =
-		"HTTP/1.1 408 Request Timeout\r\n"
-		"Content-Length: 20\r\n"
-		"Connection: close\r\n"
-		"\r\n"
-		"408 Request Timeout\n";
+void	Connection::queueResponse(const std::string& raw) {
+	_writeBuffer = raw;
+	_writeOffset = 0;
 	_state = WRITING;
 }
 
-void	Connection::buildBadRequestResponse() {
-	_writeBuffer =
-		"HTTP/1.1 400 Bad Request\r\n"
-		"Content-Length: 16\r\n"
-		"Connection: close\r\n"
-		"\r\n"
-		"400 Bad Request\n";
-	_state = WRITING;
+static const char*	errorPhrase(int code) {
+	switch (code) {
+		case 400:
+			return "400 - Bad Request";
+		case 404:
+			return "404 - Not Found";
+		case 408:
+			return "408 - Request Timeout";
+		case 413:
+			return "413 - Content Too Large";
+		case 431:
+			return "431 - Request Header Fields Too Large";
+		default:
+			return "500 - Internal Server Error";
+	}
+}
+
+// resposta chumbada por enquanto para funcionar os testers e o servidor
+void	Connection::buildErrorResponse(int code) {
+	const std::string	phrase = errorPhrase(code);
+
+	Logger::info() << "fd=" << _fd.get() << " -> " << phrase;
+	queueResponse("HTTP/1.1 " + phrase + "\r\nConnection: close\r\n\r\n" + phrase + "\n");
 }

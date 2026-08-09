@@ -1,6 +1,7 @@
 #include "Network/EventLoop.hpp"
 #include "Config/Config.hpp"
 #include "Utils/Logger.hpp"
+#include <signal.h>
 #include <iostream>
 #include <cstdlib>
 
@@ -13,6 +14,7 @@ static const char*	resolveConfigPath(int ac, char **av)
 
 int main(int ac, char **av)
 {
+	signal(SIGPIPE, SIG_IGN);
 	Logger::setLevel(Logger::DEBUG);
 	if (ac > 2) {
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;

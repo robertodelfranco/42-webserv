@@ -8,9 +8,6 @@
 
 #define CONNECTION_TIMEOUT 30
 
-// Copia os Server parseados (não deveriam mudar depois disso) e já abre
-// os sockets ouvintes.
-
 /*	style guide google: "if the signature and initializer list are not
 	all on one line, you must wrap before the colon and indent 4 spaces."
 	sim, sou fresco rs... fica muito feio tudo numa linha. (edu) */
@@ -20,6 +17,8 @@ EventLoop::EventLoop(const std::vector<ServerConfig>& servers)
 	  _listenerServers(),
 	  _connections() {
 	openListeners();
+	if (_listeners.empty())
+		throw std::runtime_error("LISTENERS EMPTY");
 }
 
 // Libera os Socket* e Connection* que o próprio EventLoop criou com new
@@ -108,9 +107,6 @@ std::vector<pollfd>	EventLoop::buildPollfds() {
 void	EventLoop::run() {
 	for (;;) {
 		std::vector<pollfd>	pollfds = buildPollfds();
-		
-		if (pollfds.empty())
-			continue; // não há sockets para monitorar, então não faz sentido chamar poll()
 	
 		int	timeoutMs = getPollTimeoutMs();
 

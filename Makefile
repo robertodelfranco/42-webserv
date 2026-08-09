@@ -1,6 +1,7 @@
 NAME	=	webserv
 CC		=	c++
-FLAGS	=	-Wall -Werror -Wextra -std=c++98
+FLAGS	=	-Wall -Werror -Wextra -std=c++98 -MMD -MP
+DEPS	=	$(OBJS:.o=.d)
 
 SRC_DIR	=	src
 SRCS	=	main.cpp \
@@ -61,5 +62,7 @@ fclean:	clean
 	@echo "${RED}All files cleaned!${NC}"
 
 re: fclean all
+
+-include $(DEPS)
 
 .PHONY: all clean fclean re
