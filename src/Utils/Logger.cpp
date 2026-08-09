@@ -8,12 +8,8 @@ bool			Logger::_color		= true;
 std::ofstream	Logger::_file;
 
 Logger::Stream::Stream(Level level)
-	: _level(level), _buffer(), _active(Logger::isEnabled(level))
-{
-}
+	: _level(level), _buffer(), _active(Logger::isEnabled(level)) {}
 
-// Cópia "destrutiva": transfere o direito de imprimir para o novo objeto,
-// senão o retorno por valor de info() geraria duas linhas iguais.
 Logger::Stream::Stream(const Stream& other)
 	: _level(other._level), _buffer(), _active(other._active)
 {

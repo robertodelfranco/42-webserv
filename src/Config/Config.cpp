@@ -23,7 +23,7 @@ void	Config::load(const char *file) {
 		const std::vector<Listen>& l = servers[i].getListens();
 		for (size_t j = 0; j < l.size(); ++j)
 			Logger::debug() << "  server[" << i << "] listen " << l[j].host << ":" << l[j].port;
-}
+	}
 }
 
 const std::vector<ServerConfig>&	Config::getServers() const {
