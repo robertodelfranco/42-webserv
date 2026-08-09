@@ -60,7 +60,8 @@ class HttpRequest
         std::string        getHeader(const std::string &key) const;
         const std::map<std::string, std::string> &getHeaders() const;
 
-
+        // APAGAR QUANDO O PARSER FOR LIGADO
+        void    setRequestLineProvisional(std::string& method, std::string& path, std::string& version);
 
 
     ////////////////////////////////////////////////////////////////////////////

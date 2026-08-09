@@ -147,3 +147,10 @@ HttpRequest::HttpRequest(const std::string &mock)
 	else
 		exit(1);
 }
+
+void	HttpRequest::setRequestLineProvisional(std::string& method, std::string& path, std::string& version)
+{
+	method_			= method;
+	path_			= path;
+	httpVersion_	= version;
+}
