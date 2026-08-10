@@ -1,6 +1,7 @@
 #include "Connection.hpp"
 #include "Socket.hpp"
 #include "Router.hpp"
+#include "../Response/ResponseWriter.hpp"
 #include "../Config/Color.hpp"
 #include "iostream"
 #include <cerrno>
@@ -344,5 +345,9 @@ void	Connection::buildErrorResponse(int code) {
 	_keepAlive = false;
 
 	Logger::info() << "fd=" << _fd.get() << " -> " << phrase;
-	queueResponse("HTTP/1.1 " + phrase + "\r\nConnection: close\r\n\r\n" + phrase + "\n");
+	HttpResponse response;
+	response.setStatus(code);
+	response.setHeader("Connection", "close");
+	response.setBody(phrase + "\n");
+	queueResponse(ResponseWriter::write(response));
 }
