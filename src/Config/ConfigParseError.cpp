@@ -1,5 +1,5 @@
 #include "ConfigParseError.hpp"
-#include "Color.hpp"
+#include "../Utils/Color.hpp"
 #include <sstream>
 
 ConfigParseError::ConfigParseError(const std::string& msg, size_t line, size_t col, const std::string& snippet) {

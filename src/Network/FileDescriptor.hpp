@@ -20,6 +20,7 @@ class FileDescriptor {
 		int		get() const;
 		void	close();
 		int		release();
+		void	reset(int fd);
 };
 
 #endif

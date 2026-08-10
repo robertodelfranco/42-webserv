@@ -1,7 +1,6 @@
 #include "Connection.hpp"
 #include "Socket.hpp"
 #include "Router.hpp"
-#include "../Config/Color.hpp"
 #include "iostream"
 #include <cerrno>
 #include <sstream>
