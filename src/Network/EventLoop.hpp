@@ -34,8 +34,19 @@ class EventLoop {
 		// Pega o quanto de timeout pro poll
 		int		getPollTimeoutMs() const;
 
-		// Função para montar o pollfd todo
-		std::vector<pollfd>	buildPollfds();
+		/* Monta o pollfd todo e, junto, o vetor owners PARALELO POR ÍNDICE:
+		owners[i] é a Connection dona de pollfds[i] (NULL nos slots dos
+		listeners). Com os pipes do CGI no meio, "tudo depois dos listeners é
+		socket de conexão" deixou de valer, e é o owners que diz de quem é
+		cada fd. Ele é reconstruído do zero a cada volta justamente pra nunca
+		ficar dessincronizado - um map<fd, Connection*> persistente exigiria
+		register/unregister em cada abertura e fechamento de pipe. */
+		std::vector<pollfd>	buildPollfds(std::vector<Connection*>& owners);
+
+		/* Depois de despachar os eventos: cobra o prazo do CGI e faz o
+		waitpid das conexões que já viram o EOF. Precisa ser um passo próprio
+		porque um filho travado (ou já morto) não gera evento nenhum no poll. */
+		void	pumpCgiConnections(std::time_t now);
 
 	public:
 		explicit EventLoop(const std::vector<ServerConfig>& servers);
