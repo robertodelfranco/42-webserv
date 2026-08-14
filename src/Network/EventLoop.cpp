@@ -7,12 +7,6 @@
 #include <unistd.h>
 #include "../Cgi/CgiProcess.hpp"
 
-// CONNECTION_TIMEOUT vive no Connection.hpp: quem sabe qual prazo se aplica a
-// uma conexão (o de ociosidade ou o do CGI) é a própria Connection.
-
-/*	style guide google: "if the signature and initializer list are not
-	all on one line, you must wrap before the colon and indent 4 spaces."
-	sim, sou fresco rs... fica muito feio tudo numa linha. (edu) */
 EventLoop::EventLoop(const std::vector<ServerConfig>& servers)
 	: _servers(servers),
 	  _listeners(),
@@ -66,9 +60,6 @@ int	EventLoop::getPollTimeoutMs() const {
 	std::time_t	now = std::time(NULL);
 	int	smallestRemaining = CONNECTION_TIMEOUT;
 
-	/* Quem sabe o próprio prazo é a Connection: pra uma em CGI o que conta é
-	o CGI_TIMEOUT contado do fork, não a ociosidade. Sem isso o poll dormiria
-	os 30s da conexão enquanto um filho travado nunca acorda ninguém. */
 	for (std::map<int, Connection*>::const_iterator it = _connections.begin(); it != _connections.end(); ++it) {
 		int remaining = it->second->remainingBudget(now);
 
@@ -107,21 +98,15 @@ std::vector<pollfd>	EventLoop::buildPollfds(std::vector<Connection*>& owners) {
 			events |= POLLIN;
 		if (conn->hasPendingWrite())
 			events |= POLLOUT;
-		/* Durante o CGI o socket também pede POLLIN, mesmo sem querer ler
-		request nenhuma: quando o cliente desiste (Ctrl-C no curl), o que
-		chega é um FIN, e FIN acorda POLLIN, não POLLHUP - o POLLHUP de um
-		socket TCP só vem depois que os DOIS lados fecharam. Sem pedir POLLIN
-		aqui, o servidor só descobriria o abandono no timeout de 10s, gerando
-		uma resposta que ninguém mais vai ler. */
+		/* Sem pedir POLLIN aqui, o servidor só descobriria o abandono no timeout de 10s,
+		gerando uma resposta que ninguém mais vai ler */
 		if (conn->getState() == CGI_RUNNING)
 			events |= POLLIN;
 		pollfds.push_back(makePollfd(it->first, events));
 		owners.push_back(conn);
 
-		/* Os pipes do CGI entram no MESMO poll() dos sockets - é o que o
-		subject exige (nenhum I/O fora do poll) e é o que evita o deadlock do
-		pipe cheio: as duas pontas ficam armadas ao mesmo tempo, nunca em
-		fases separadas. */
+		/* Os pipes do CGI entram no MESMO poll() dos sockets, é uma das exigências
+		do subject (nenhum I/O fora do poll) e é o que evita o deadlock */
 		if (conn->getState() == CGI_RUNNING && conn->hasCgi()) {
 			CgiProcess*	cgi = conn->getCgi();
 
@@ -162,10 +147,10 @@ void	EventLoop::run() {
 			if (pollfds[i].revents & POLLIN)
 				acceptReadyListener(i);
 
-		/* Cada slot pode ser o socket da conexão OU um dos pipes do CGI dela:
-		quem diz é o owners. O isClosing() protege o caso de a conexão ter
-		fechado num slot anterior DESTA MESMA volta - os slots seguintes dela
-		apontariam pra um objeto que já vai ser deletado. */
+		/* Cada slot pode ser o socket da conexão ou um dos pipes do CGI dela,
+		quem diz pra mim é o owner. O isClosing protege o caso de a conexão ter
+		fechado um slot antes dessa volta, os seguintes dela apontariam pra um
+		objeto que já vai ser deletado */
 		for (size_t i = _listeners.size(); i < pollfds.size(); ++i) {
 			Connection*	conn = owners[i];
 
@@ -218,9 +203,8 @@ void	EventLoop::handleConnectionEvent(const pollfd& event, std::time_t now) {
 		return;
 	}
 
-	/* Algo chegou no socket com um CGI rodando: ou o cliente desistiu (FIN),
-	ou ele pipelinou a próxima request. Só o recv() distingue os dois, e é a
-	Connection que faz isso - o EventLoop não mexe em bytes. */
+	/* Algo chegou no socket com um CGI rodando, cliente desistiu ou ele 
+	encaminhou a próxima request. Só o recv da conn distingue os dois */
 	if (conn->getState() == CGI_RUNNING) {
 		if (event.revents & (POLLIN | POLLERR | POLLHUP))
 			conn->onCgiClientEvent();
@@ -228,8 +212,8 @@ void	EventLoop::handleConnectionEvent(const pollfd& event, std::time_t now) {
 			return;
 	}
 
-	/* Conexão em CGI é ISENTA do sweep de ociosidade: ela não está parada,
-	está esperando o filho, que tem prazo próprio cobrado no checkCgi(). */
+	/* Conexão em CGI é ISENTA do timeout de ociosidade pq ela não está parada,
+	está esperando o filho que tem o prazo próprio cobrado no checkCgi() */
 	if (conn->getState() != CGI_RUNNING
 		&& now - conn->getLastActivity() >= CONNECTION_TIMEOUT)
 		conn->onTimeout();
@@ -241,10 +225,9 @@ void	EventLoop::handleConnectionEvent(const pollfd& event, std::time_t now) {
 		conn->onWritable();
 }
 
-/* Sem este passo, o EOF lido nesta volta só seria notado na volta seguinte -
-e não haveria volta seguinte: com o stdout já fechado, nenhum fd do CGI está
-no poll pra acordar o loop. Por isso o waitpid e a cobrança do prazo vêm
-DEPOIS do despacho dos eventos, fechando o ciclo na mesma passada. */
+/* checar o EOF antes do stdout fechar na próxima volta, nenhum fd do CGI está
+no poll pra acordar o loop. Por isso o waitpid e a cobrança do prazo vem
+depois do despacho dos eventos, fechando o ciclo na mesma passada */
 void	EventLoop::pumpCgiConnections(std::time_t now) {
 	for (std::map<int, Connection*>::iterator it = _connections.begin();
 		it != _connections.end(); ++it) {
