@@ -42,7 +42,24 @@ const Location* Router::matchLocation(const ServerConfig& server, const std::str
 	return best;
 }
 
-/* classifica se é CGI, static, dir, erro */									 
+/* bitmask usado aqui, 0 = método desconhecido */
+static size_t	methodBit(const std::string& method) {
+	if (method == "GET")
+		return GET;
+	if (method == "POST")
+		return POST;
+	if (method == "DELETE")
+		return DELETE;
+	return 0;
+}
+
+bool	Router::methodAllowed(const Location& loc, const HttpRequest& req) {
+	size_t	bit = methodBit(req.getMethod());
+
+	return bit != 0 && (loc.getAllowMethods() & bit) != 0;
+}
+
+/* classifica se é CGI, static, dir, erro */
 RouteType Router::classify(const Location& loc, const HttpRequest& req) {
 	const std::string&	cgi_type = loc.getCgiType();
 	const std::string&	path = req.getPath();
