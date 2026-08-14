@@ -28,10 +28,12 @@ class HttpRequest
 
     private:
         // ===== Request line =====
-		/* para o CGI, talvez path precise ser dividido em path e query_string,
-		mas posso resolver isso depois - aqui ou diretamente no CGI. (edu) */
+		/* resolvido aqui, o corte é no primeiro '?',
+        assim path_ fica sem query (Router precisa disso
+	    pra não procurar por "hello.py?a=1") e query_ guarda o resto */
         std::string method_;
         std::string path_;
+        std::string query_;
         std::string httpVersion_;
 
         // ===== Headers + body =====
@@ -55,13 +57,19 @@ class HttpRequest
         // ===== Public API =====
         const std::string &getMethod() const;
         const std::string &getPath() const;
+        const std::string &getQuery() const;
         const std::string &getHTTPVersion() const;
         const std::string &getBody() const;
         std::string        getHeader(const std::string &key) const;
         const std::map<std::string, std::string> &getHeaders() const;
 
-        // APAGAR QUANDO O PARSER FOR LIGADO
-        void    setRequestLineProvisional(std::string& method, std::string& path, std::string& version);
+        /* APAGAR QUANDO O PARSER FOR LIGADO. Enquanto o HttpParser não recebe
+        os bytes do Connection, é o framing provisório de lá que preenche e ele não é friend, então precisa desses setters. Some tudo
+        junto com o checkRequestFraming(). */
+        void    setRequestLineProvisional(const std::string& method, const std::string& path,
+                                          const std::string& query, const std::string& version);
+        void    setHeaderProvisional(const std::string& key, const std::string& value);
+        void    setBodyProvisional(const std::string& body);
 
 
     ////////////////////////////////////////////////////////////////////////////
