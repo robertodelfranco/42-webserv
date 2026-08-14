@@ -3,9 +3,13 @@
 #include "Router.hpp"
 #include "iostream"
 #include <cerrno>
+#include <cstdlib>
 #include <sstream>
+#include <poll.h>
 #include <sys/socket.h>
 #include "../Utils/Logger.hpp"
+#include "../Cgi/CgiProcess.hpp"
+#include "../Cgi/CgiOutputParser.hpp"
 
 #ifndef MSG_NOSIGNAL
 # define MSG_NOSIGNAL 0
@@ -15,8 +19,13 @@
 static const size_t	MAX_HEADER_SIZE = 8192;
 
 /* ========================= framing provisório =========================
-Esses dois helpers e o checkRequestFraming() SAEM DAQUI quando o HttpParser
+Esses helpers e o checkRequestFraming() SAEM DAQUI quando o HttpParser
 tiver um feed(), Connection não deve conhecer de HTTP em nenhum momento (Roberto)
+
+Enquanto isso, é este bloco que preenche o _request INTEIRO (request line,
+query, headers e body), porque o CGI precisa de tudo isso: sem os headers não
+existem as meta-variáveis HTTP_*, sem a query não existe QUERY_STRING e sem o
+body não existe POST. Quando o parser do edu ligar, o bloco todo morre junto.
 ============================================================================ */
 static bool	findHeader(const std::string& block, const std::string& name, std::string& out) {
 	std::string::size_type	lineStart = block.find("\r\n");
@@ -56,10 +65,71 @@ static void	parseRequestLineProvisional(const std::string& headers, HttpRequest&
 	std::string target = firstLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
 	std::string version = firstLine.substr(secondSpace + 1);
 
+	// o corte no '?' já existia aqui, só o lado direito estava sendo jogado
+	// fora: é ele que vira o QUERY_STRING do CGI.
 	size_t	cutInterr = target.find("?");
 	std::string	path = (cutInterr == std::string::npos) ? target : target.substr(0, cutInterr);
+	std::string	query = (cutInterr == std::string::npos) ? "" : target.substr(cutInterr + 1);
 
-	req.setRequestLineProvisional(method, path, version);
+	req.setRequestLineProvisional(method, path, query, version);
+}
+
+/* Mesma varredura do findHeader() acima, só que guardando TODOS os pares em
+vez de procurar um. Nome em minúscula, que é como o getHeader() consulta. */
+static void	parseHeadersProvisional(const std::string& block, HttpRequest& req) {
+	std::string::size_type	lineStart = block.find("\r\n");
+
+	if (lineStart == std::string::npos)
+		return;
+	lineStart += 2;
+
+	while (lineStart < block.size()) {
+		std::string::size_type	lineEnd = block.find("\r\n", lineStart);
+		if (lineEnd == std::string::npos)
+			lineEnd = block.size();
+
+		std::string::size_type	colon = block.find(':', lineStart);
+		if (colon != std::string::npos && colon < lineEnd) {
+			std::string				name = toLower(block.substr(lineStart, colon - lineStart));
+			std::string				value = block.substr(colon + 1, lineEnd - colon - 1);
+			std::string::size_type	begin = value.find_first_not_of(" \t");
+			std::string::size_type	end = value.find_last_not_of(" \t");
+
+			req.setHeaderProvisional(name, (begin == std::string::npos)
+										   ? "" : value.substr(begin, end - begin + 1));
+		}
+		lineStart = lineEnd + 2;
+	}
+}
+
+/* Espelho do isValidChunkedBody() do parser: percorre o mesmo formato, mas
+concatenando os payloads. O resto do servidor (o CGI em especial) só pode ver
+body decodificado - o subject é explícito em dizer que o CGI recebe os bytes
+já desmontados e descobre o fim pelo EOF, não por marcador de chunk. */
+static std::string	decodeChunkedProvisional(const std::string& body) {
+	std::string	out;
+	size_t		pos = 0;
+
+	while (true) {
+		size_t	lineEnd = body.find("\r\n", pos);
+		if (lineEnd == std::string::npos)
+			break;
+
+		std::string	sizeHex = body.substr(pos, lineEnd - pos);
+		char		*end;
+		long		chunkSize = std::strtol(sizeHex.c_str(), &end, 16);
+
+		if (end == sizeHex.c_str() || chunkSize <= 0)
+			break; // chunk de tamanho 0 é o fim da lista
+
+		pos = lineEnd + 2;
+		if (pos + static_cast<size_t>(chunkSize) > body.size())
+			break;
+
+		out.append(body, pos, static_cast<size_t>(chunkSize));
+		pos += static_cast<size_t>(chunkSize) + 2; // pula o CRLF do fim do chunk
+	}
+	return out;
 }
 
 static bool	parseContentLength(const std::string& raw, long long& out) {
@@ -79,11 +149,15 @@ Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _headersEnd(std::string::npos), _bodyExpected(-1),
   _requestEnd(0), _chunked(false), _keepAlive(false), _writeBuffer(),
   _writeOffset(0), _candidate(candidate), _lastActivity(std::time(NULL)),
-  _parser(), _request(), _response(), _state(READING) {
+  _parser(), _request(), _response(), _state(READING), _cgi(NULL) {
 	Socket::setNonBlocking(_fd.get());
 }
 
-Connection::~Connection() {}
+// delete num CgiProcess mata e colhe o filho (o destructor dele faz isso),
+// então nenhum caminho de morte da conexão deixa processo solto pra trás.
+Connection::~Connection() {
+	delete _cgi;
+}
 
 int	Connection::getFd() const {
 	return _fd.get();
@@ -116,6 +190,13 @@ void	Connection::requestClose() {
 void	Connection::onTimeout() {
 	if (_state == CLOSED)
 		return;
+	/* CGI não morre calado: o cliente merece um 504 e o filho merece um
+	SIGKILL. Antes daqui, um sweep de ociosidade apagava a conexão inteira
+	sem responder nada e deixava o processo rodando sozinho. */
+	if (_state == CGI_RUNNING) {
+		abortCgi(504);
+		return;
+	}
 	if (_state != READING) {
 		_state = CLOSED;
 		return;
@@ -142,6 +223,7 @@ Connection::RequestStatus	Connection::checkRequestFraming() {
 		std::string			value;
 
 		parseRequestLineProvisional(headers, _request);
+		parseHeadersProvisional(headers, _request);
 
 		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked")
 			_chunked = true;
@@ -205,6 +287,13 @@ void	Connection::resetForNextRequest() {
 	_lastActivity = std::time(NULL); // nova janela de ociosidade
 	_state = READING;
 
+	// keep-alive limpo: nenhum resto do CGI anterior atravessa pra próxima
+	// request (o finishCgi/abortCgi já deletou, isto é só a garantia).
+	if (_cgi) {
+		delete _cgi;
+		_cgi = NULL;
+	}
+
 	Logger::debug() << "fd=" << _fd.get() << " keep-alive: pronto pra proxima ("
 		<< _readBuffer.size() << " bytes ja no buffer)";
 }
@@ -214,10 +303,17 @@ void	Connection::processReadBuffer() {
 	switch (checkRequestFraming()) {
 		case REQ_INCOMPLETE:
 			break; // volta pro poll() e espera o resto chegar
-		case REQ_COMPLETE:
+		case REQ_COMPLETE: {
+			/* A request line e os headers já foram preenchidos assim que o
+			bloco de headers fechou; o body só dá pra recortar agora, que é
+			quando o _requestEnd existe. Chunked entra decodificado. */
+			const std::string	body = _readBuffer.substr(_headersEnd, _requestEnd - _headersEnd);
+
+			_request.setBodyProvisional(_chunked ? decodeChunkedProvisional(body) : body);
 			decideKeepAlive();
 			handleRequest();
 			break;
+		}
 		case REQ_TOO_LARGE:
 			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
 				<< _candidate->getBodySize() << " bytes";
@@ -299,6 +395,14 @@ void	Connection::handleRequest() {
 		return ;
 	}
 
+	// método barrado pela config é 405, e é decidido antes de escolher handler
+	if (!Router::methodAllowed(*matchedLoc, _request)) {
+		Logger::warning() << "fd=" << _fd.get() << " metodo " << _request.getMethod()
+			<< " nao permitido em " << matchedLoc->getPath();
+		buildErrorResponse(405);
+		return ;
+	}
+
 	IRequestHandler* handler = Router::createHandler(*matchedLoc, _request);
 	if (!handler) {
 		Logger::debug() << "CAINDO NO !handler";
@@ -347,14 +451,22 @@ static const char*	errorPhrase(int code) {
 	switch (code) {
 		case 400:
 			return "400 - Bad Request";
+		case 403:
+			return "403 - Forbidden";
 		case 404:
 			return "404 - Not Found";
+		case 405:
+			return "405 - Method Not Allowed";
 		case 408:
 			return "408 - Request Timeout";
 		case 413:
 			return "413 - Content Too Large";
 		case 431:
 			return "431 - Request Header Fields Too Large";
+		case 502:
+			return "502 - Bad Gateway";
+		case 504:
+			return "504 - Gateway Timeout";
 		default:
 			return "500 - Internal Server Error";
 	}
@@ -368,4 +480,149 @@ void	Connection::buildErrorResponse(int code) {
 
 	Logger::info() << "fd=" << _fd.get() << " -> " << phrase;
 	queueResponse("HTTP/1.1 " + phrase + "\r\nConnection: close\r\n\r\n" + phrase + "\n");
+}
+
+// ============================== CGI ==============================
+
+void	Connection::adoptCgiProcess(CgiProcess* cgi) {
+	delete _cgi; // não deveria haver outro, mas dois filhos numa conexão só seria pior
+	_cgi = cgi;
+}
+
+bool	Connection::hasCgi() const {
+	return _cgi != NULL;
+}
+
+CgiProcess*	Connection::getCgi() {
+	return _cgi;
+}
+
+unsigned short	Connection::getServerPort() const {
+	const std::vector<Listen>&	listens = _candidate->getListens();
+
+	return listens.empty() ? 0 : listens[0].port;
+}
+
+/* O EventLoop entrega o evento cru; aqui só se decide de qual ponta ele veio.
+A comparação com os fds do processo é também a proteção contra um revents
+atrasado de um pipe que já foi fechado: fd fechado vale -1 e nunca casa. */
+void	Connection::onCgiFdEvent(int fd, short revents) {
+	if (!_cgi)
+		return;
+
+	if (fd == _cgi->getStdinFd()) {
+		// POLLERR/POLLNVAL: a ponta morreu de vez, não adianta tentar escrever.
+		// POLLHUP aqui é o filho tendo fechado o stdin dele - o write devolve
+		// erro e o onStdinWritable fecha a ponta, que é o que queremos.
+		if (revents & (POLLERR | POLLNVAL))
+			_cgi->closeStdin();
+		else if (revents & (POLLOUT | POLLHUP))
+			_cgi->onStdinWritable();
+	}
+	else if (fd == _cgi->getStdoutFd()) {
+		// POLLHUP no stdout é o filho terminando: ainda pode haver bytes no
+		// cano, então lemos do mesmo jeito e é o read()==0 que decreta o EOF.
+		if (revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))
+			_cgi->onStdoutReadable();
+	}
+	_lastActivity = std::time(NULL);
+}
+
+void	Connection::checkCgi(std::time_t now) {
+	if (!_cgi)
+		return;
+
+	// O prazo é cobrado do fork, não da última atividade: um script que
+	// escreve um byte por segundo pra sempre também precisa morrer.
+	if ((_cgi->getPhase() == CgiProcess::RUNNING || _cgi->getPhase() == CgiProcess::REAPING)
+		&& now - _cgi->getStartTime() >= CGI_TIMEOUT) {
+		Logger::warning() << "fd=" << _fd.get() << " CGI estourou " << CGI_TIMEOUT << "s";
+		abortCgi(504);
+		return;
+	}
+
+	if (_cgi->getPhase() == CgiProcess::REAPING)
+		_cgi->checkChild();
+
+	if (_cgi->getPhase() == CgiProcess::FAILED) {
+		abortCgi(502);
+		return;
+	}
+	if (_cgi->getPhase() == CgiProcess::COMPLETE)
+		finishCgi();
+}
+
+void	Connection::finishCgi() {
+	std::string	response;
+
+	/* Traduzir a saída pode falhar de duas formas, e as duas são 502 (o erro
+	é do "gateway", não do cliente): o script morreu sem dizer nada, ou
+	escreveu algo que não tem bloco de headers. */
+	if (!CgiOutputParser::toHttpResponse(_cgi->getOutput(), _keepAlive, response)) {
+		Logger::warning() << "fd=" << _fd.get() << " CGI devolveu saida invalida (exit="
+			<< _cgi->getExitStatus() << ", " << _cgi->getOutput().size() << " bytes)";
+		delete _cgi;
+		_cgi = NULL;
+		buildErrorResponse(502);
+		return;
+	}
+
+	Logger::info() << "fd=" << _fd.get() << " CGI ok (exit=" << _cgi->getExitStatus()
+		<< ", " << response.size() << " bytes)";
+	delete _cgi;
+	_cgi = NULL;
+	queueResponse(response);
+	_lastActivity = std::time(NULL);
+}
+
+/* O delete é o que mata o filho: se ele ainda estiver vivo, ~CgiProcess dá
+SIGKILL e colhe. Depois disso a conexão volta a ser uma conexão comum, com
+uma resposta de erro pra mandar. */
+void	Connection::abortCgi(int code) {
+	delete _cgi;
+	_cgi = NULL;
+	buildErrorResponse(code);
+	_lastActivity = std::time(NULL);
+}
+
+void	Connection::dropCgi() {
+	delete _cgi;
+	_cgi = NULL;
+}
+
+void	Connection::onCgiClientEvent() {
+	char	buf[4096];
+	ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
+
+	if (n > 0) {
+		/* Cliente adiantando a próxima request enquanto esta ainda cozinha.
+		Guarda e não processa agora: uma conexão trata uma request por vez, e
+		o resetForNextRequest vai encontrar esses bytes já no buffer. */
+		_readBuffer.append(buf, static_cast<size_t>(n));
+		_lastActivity = std::time(NULL);
+		return;
+	}
+
+	/* n == 0 é o FIN: o cliente fechou e não vai ler resposta nenhuma.
+	Matar o filho agora é o certo - deixá-lo terminando um trabalho que
+	ninguém vai buscar é queimar CPU e segurar um slot de processo. */
+	Logger::debug() << "fd=" << _fd.get() << " cliente desistiu durante o CGI";
+	dropCgi();
+	_state = CLOSED;
+}
+
+int	Connection::remainingBudget(std::time_t now) const {
+	if (_state == CGI_RUNNING && _cgi) {
+		/* Fase REAPING = já vi o EOF e só falta o waitpid confirmar. Não há
+		mais fd nenhum pra acordar o poll(), então o timeout tem que ser 0 pra
+		a volta seguinte colher o filho na hora, em vez de esperar 10s. */
+		if (_cgi->getPhase() != CgiProcess::RUNNING)
+			return 0;
+
+		int	remaining = CGI_TIMEOUT - static_cast<int>(now - _cgi->getStartTime());
+		return remaining < 0 ? 0 : remaining;
+	}
+
+	int	remaining = CONNECTION_TIMEOUT - static_cast<int>(now - _lastActivity);
+	return remaining < 0 ? 0 : remaining;
 }

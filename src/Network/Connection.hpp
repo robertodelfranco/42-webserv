@@ -9,6 +9,14 @@
 #include "../Request/HttpParser.hpp"
 #include "../Response/HttpResponse.hpp"
 
+/* forward declaration: o Connection só guarda um ponteiro pro processo do CGI
+e delega tudo. Quem inclui Connection.hpp não precisa saber o que é um pipe. */
+class CgiProcess;
+
+// Janela de ociosidade de uma conexão comum. Uma conexão em CGI_RUNNING é
+// ISENTA disso: ela não está ociosa, está esperando o filho (que tem o
+// prazo próprio dele, o CGI_TIMEOUT).
+#define CONNECTION_TIMEOUT 30
 
 /* ESSE ENUM VAMOS USAR PARA REPRESENTAR O ESTADO DA CONEXÃO. */
 enum State {
@@ -52,6 +60,11 @@ class Connection {
 		HttpResponse		_response;     // resposta a ser enviada
 		State				_state;
 
+		/* NULL quando não há CGI rodando. O CgiHandler é deletado logo depois
+		do handle(), então ele passa a posse do processo pra cá antes de morrer:
+		o filho precisa de alguém que viva por várias voltas do poll(). */
+		CgiProcess*			_cgi;
+
 		Connection(const Connection& other);
 		Connection& operator=(const Connection& other);
 
@@ -75,7 +88,11 @@ class Connection {
 		// interpreta os bytes; quando o parser existir, é só esta linha
 		// que passa o _readBuffer adiante e recebe a resposta pronta.
 		void			handleRequest();
-		void			buildErrorResponse(int code);
+
+		// o CGI acabou bem: traduz a saída do script e enfileira a resposta
+		void			finishCgi();
+		// o CGI acabou mal (timeout, crash, saída inválida): mata e responde erro
+		void			abortCgi(int code);
 
 	public:
 		Connection(int fd, const ServerConfig* candidate);
@@ -97,9 +114,47 @@ class Connection {
 		// o handleRequest() passa a chamar queueResponse(_response.toString())
 		void			queueResponse(const std::string& raw);
 
+		// os handlers respondem erro por aqui (o CGI usa pra 404/403/502/504)
+		void			buildErrorResponse(int code);
+
 		// para acessar o estado do processamento do request pelo handler.
 		State			getState() const;
 		void			setState(State newState);
+
+		// ======================== CGI ========================
+
+		/* O handler entrega o processo já lançado e some. A partir daqui a
+		conexão é a dona: se ela morrer, o destructor mata o filho junto. */
+		void			adoptCgiProcess(CgiProcess* cgi);
+		bool			hasCgi() const;
+		CgiProcess*		getCgi();
+
+		/* Um dos pipes do CGI acordou no poll(). A Connection não lê nem
+		escreve em pipe: ela só descobre de qual das duas pontas veio o evento
+		e repassa pro CgiProcess. */
+		void			onCgiFdEvent(int fd, short revents);
+
+		/* Mata o filho e esquece o CGI, SEM montar resposta: é o caso do
+		cliente que desistiu no meio: não há mais pra quem responder. */
+		void			dropCgi();
+
+		/* O socket do cliente acordou enquanto o CGI roda. Pode ser o cliente
+		indo embora (fecha tudo) ou ele adiantando a próxima request
+		(guardada pro keep-alive tratar depois). */
+		void			onCgiClientEvent();
+
+		/* Chamada uma vez por volta do loop pra toda conexão em CGI_RUNNING:
+		é aqui que o timeout do filho é cobrado e que o waitpid acontece. Sem
+		isso um filho travado e mudo nunca geraria evento nenhum. */
+		void			checkCgi(std::time_t now);
+
+		/* Quantos segundos faltam pro prazo DESTA conexão estourar - o do CGI
+		quando há um rodando, o de ociosidade caso contrário. O EventLoop usa
+		isso pro timeout do poll(). */
+		int				remainingBudget(std::time_t now) const;
+
+		// porta do listener que aceitou esta conexão (meta-variável SERVER_PORT)
+		unsigned short	getServerPort() const;
 
 	};
 
