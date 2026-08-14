@@ -12,6 +12,7 @@
 
 #include "Router.hpp"
 #include "../Handlers/CgiHandler.hpp"
+#include "../Utils/Logger.hpp"
 
 Router::Router()
 {
@@ -36,16 +37,17 @@ const Location* Router::matchLocation(const ServerConfig& server, const std::str
 			best = &(*it);
 		}
 	}
-
+	if (best)
+		Logger::info() << "BEST " << best->getPath();
 	return best;
 }
 
 /* classifica se é CGI, static, dir, erro */									 
-RouteType Router::classify(const Location& loc, const HttpRequest& req)
-{
+RouteType Router::classify(const Location& loc, const HttpRequest& req) {
 	const std::string&	cgi_type = loc.getCgiType();
 	const std::string&	path = req.getPath();
 
+	Logger::info() << "CLASSIFY " << path << " " << cgi_type;
 	if (!cgi_type.empty() && path.size() >= cgi_type.size()
 			&& path.compare(path.size() - cgi_type.size(), cgi_type.size(), cgi_type) == 0)
 		return CGI;
@@ -56,11 +58,11 @@ RouteType Router::classify(const Location& loc, const HttpRequest& req)
 
 /* instancia e retorna a subclasse correta de IRequestHandler!
 esse é o famoso design pattern chamado de factory method */
-IRequestHandler* Router::createHandler(const Location& loc,
-											  const HttpRequest& req)
+IRequestHandler* Router::createHandler(const Location& loc, const HttpRequest& req)
 {
 	switch (classify(loc, req)) {
 		case CGI:
+			Logger::info() << "CGI";
 			return new CgiHandler();
 		
 		default:
