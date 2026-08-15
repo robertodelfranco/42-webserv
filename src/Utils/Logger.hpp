@@ -9,7 +9,6 @@
 class Logger {
 	public:
 		// A ordem importa: só é impresso o que tiver nível >= _level.
-		// SILENT desliga tudo.
 		enum Level {
 			DEBUG	= 0,
 			INFO	= 1,
@@ -53,7 +52,7 @@ class Logger {
 
 		static void		setLevel(Level level);
 		static Level	getLevel();
-		static bool		setLevelFromString(const std::string& name); // "debug", "info", ... ; false se inválido
+		static bool		setLevelFromString(const std::string& name); // "debug", "info", false se inválido
 
 		static void		setColorEnabled(bool enabled);
 

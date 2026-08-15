@@ -23,6 +23,9 @@ SRCS	=	main.cpp \
 			Response/HttpResponse.cpp \
 			Request/HttpRequest.cpp \
 			Request/HttpParser.cpp \
+			Handlers/CgiHandler.cpp \
+			Cgi/CgiProcess.cpp \
+			Cgi/CgiOutputParser.cpp \
 
 
 MAGENTA	=	\033[1;95m
@@ -38,7 +41,7 @@ VPATH	=	$(SRC_DIR):Config:ServerConfig:Utils:Parser:Network
 
 all:
 	@if $(MAKE) -q ${NAME} 2>/dev/null; then \
-		echo "${YELLOW}✅ ${NAME} already compiled!${NC}"; \
+		echo "${GREEN}✅ ${NAME} already compiled!${NC}"; \
 	else \
 		$(MAKE) ${NAME} --no-print-directory; \
 	fi
@@ -48,6 +51,7 @@ ${NAME}: ${OBJS}
 	@echo "${CYAN}$(NAME) compiled successfully!${NC}"
 
 $(OBJ_DIR)/%.o : %.cpp
+	@echo "${MAGENTA}[Compiling...]${NC} $<"
 	@mkdir -p $(dir $@)
 	@${CC} ${FLAGS} -o $@ -c $<
 

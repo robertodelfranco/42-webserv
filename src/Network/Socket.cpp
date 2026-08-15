@@ -80,10 +80,14 @@ void	Socket::setNonBlocking() {
 	Logger::debug() << "O_NONBLOCK setado em fd= " << _fd.get();
 }
 
+void	Socket::setCloexec(int fd) {
+	if(fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
+		throw std::runtime_error("Socket: fcntl(F_SETFD, FD_CLOEXEC) failed");
+	}
+}
+
 void	Socket::setNonBlocking(int fd) {
-	int	flags = fcntl(fd, F_GETFL, 0);
-	if (flags < 0)
-		throw std::runtime_error("Socket: fcntl(F_GETFL) failed");
-	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
-		throw std::runtime_error("Socket: fcntl(O_NONBLOCK) failed");
+	if (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)
+		throw std::runtime_error("Socket: fcntl(F_SETFL, O_NONBLOCK) failed");
+	setCloexec(fd);
 }
