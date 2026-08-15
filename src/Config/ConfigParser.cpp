@@ -351,7 +351,6 @@ void	ConfigParser::getLocationBlock(ServerConfig& server, Location* location_poi
 	if (start == tokens.end())
 		throw ConfigParseError("Expected closing brace for location block", tokens.back().line, tokens.back().col, std::string());
 
-	location.mergeDefaults(server); // preenche root/index/error_page/client_max_body_size que o location não declarou com o valor do server
 	server.addLocation(location); // única cópia, adiciona o location ao vetor de locations do server
 }
 
@@ -415,6 +414,8 @@ std::vector<Token>::iterator	ConfigParser::getServerBlock(std::vector<Token>::it
 
 	if (server.getRoot().empty())
 		throw ConfigParseError("Server block must have a 'root' directive", server_line, server_col, std::string());
+
+	server.mergeLocationDefaults();
 
 	checkListenDuplicate(servers, server);
 	servers.push_back(server);

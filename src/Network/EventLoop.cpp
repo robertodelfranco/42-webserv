@@ -5,12 +5,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <unistd.h>
+#include "../Cgi/CgiProcess.hpp"
 
-#define CONNECTION_TIMEOUT 30
-
-/*	style guide google: "if the signature and initializer list are not
-	all on one line, you must wrap before the colon and indent 4 spaces."
-	sim, sou fresco rs... fica muito feio tudo numa linha. (edu) */
 EventLoop::EventLoop(const std::vector<ServerConfig>& servers)
 	: _servers(servers),
 	  _listeners(),
@@ -60,13 +56,12 @@ void	EventLoop::openListeners() {
 int	EventLoop::getPollTimeoutMs() const {
 	if (_connections.empty())
 		return -1;
-	
+
 	std::time_t	now = std::time(NULL);
 	int	smallestRemaining = CONNECTION_TIMEOUT;
 
 	for (std::map<int, Connection*>::const_iterator it = _connections.begin(); it != _connections.end(); ++it) {
-		int elapsed = static_cast<int>(now - it->second->getLastActivity());
-		int remaining = CONNECTION_TIMEOUT - elapsed;
+		int remaining = it->second->remainingBudget(now);
 
 		if (remaining <= 0 )
 			return 0;
@@ -86,28 +81,54 @@ static pollfd	makePollfd(int fd, short events) {
 	return file;
 }
 
-std::vector<pollfd>	EventLoop::buildPollfds() {
+std::vector<pollfd>	EventLoop::buildPollfds(std::vector<Connection*>& owners) {
 	std::vector<pollfd>	pollfds;
+
+	owners.clear();
 	pollfds.reserve(_listeners.size() + _connections.size());
 	for (size_t i = 0; i < _listeners.size(); ++i) {
 		pollfds.push_back(makePollfd(_listeners[i]->getFd(), POLLIN));
+		owners.push_back(NULL); // listener não pertence a conexão nenhuma
 	}
 	for (std::map<int, Connection*>::iterator it = _connections.begin(); it != _connections.end(); ++it) {
-		short events = 0;
-		if (it->second->wantsRead())
+		Connection*	conn = it->second;
+		short		events = 0;
+
+		if (conn->wantsRead())
 			events |= POLLIN;
-		if (it->second->hasPendingWrite())
+		if (conn->hasPendingWrite())
 			events |= POLLOUT;
+		/* Sem pedir POLLIN aqui, o servidor só descobriria o abandono no timeout de 10s,
+		gerando uma resposta que ninguém mais vai ler */
+		if (conn->getState() == CGI_RUNNING)
+			events |= POLLIN;
 		pollfds.push_back(makePollfd(it->first, events));
+		owners.push_back(conn);
+
+		/* Os pipes do CGI entram no MESMO poll() dos sockets, é uma das exigências
+		do subject (nenhum I/O fora do poll) e é o que evita o deadlock */
+		if (conn->getState() == CGI_RUNNING && conn->hasCgi()) {
+			CgiProcess*	cgi = conn->getCgi();
+
+			if (cgi->wantsWriteInput()) {
+				pollfds.push_back(makePollfd(cgi->getStdinFd(), POLLOUT));
+				owners.push_back(conn);
+			}
+			if (cgi->wantsReadOutput()) {
+				pollfds.push_back(makePollfd(cgi->getStdoutFd(), POLLIN));
+				owners.push_back(conn);
+			}
+		}
 	}
-	
+
 	return pollfds;
 }
 
 void	EventLoop::run() {
 	for (;;) {
-		std::vector<pollfd>	pollfds = buildPollfds();
-	
+		std::vector<Connection*>	owners;
+		std::vector<pollfd>			pollfds = buildPollfds(owners);
+
 		int	timeoutMs = getPollTimeoutMs();
 
 		int returnCode = poll(&pollfds[0], pollfds.size(), timeoutMs);
@@ -126,8 +147,22 @@ void	EventLoop::run() {
 			if (pollfds[i].revents & POLLIN)
 				acceptReadyListener(i);
 
-		for (size_t i = _listeners.size(); i < pollfds.size(); ++i)
-			handleConnectionEvent(pollfds[i], now);
+		/* Cada slot pode ser o socket da conexão ou um dos pipes do CGI dela,
+		quem diz pra mim é o owner. O isClosing protege o caso de a conexão ter
+		fechado um slot antes dessa volta, os seguintes dela apontariam pra um
+		objeto que já vai ser deletado */
+		for (size_t i = _listeners.size(); i < pollfds.size(); ++i) {
+			Connection*	conn = owners[i];
+
+			if (!conn || conn->isClosing())
+				continue;
+			if (pollfds[i].fd == conn->getFd())
+				handleConnectionEvent(pollfds[i], now);
+			else if (pollfds[i].revents)
+				conn->onCgiFdEvent(pollfds[i].fd, pollfds[i].revents);
+		}
+
+		pumpCgiConnections(now);
 		reapClosedConnections();
 	}
 }
@@ -167,7 +202,20 @@ void	EventLoop::handleConnectionEvent(const pollfd& event, std::time_t now) {
 		conn->requestClose();
 		return;
 	}
-	if (now - conn->getLastActivity() >= CONNECTION_TIMEOUT)
+
+	/* Algo chegou no socket com um CGI rodando, cliente desistiu ou ele 
+	encaminhou a próxima request. Só o recv da conn distingue os dois */
+	if (conn->getState() == CGI_RUNNING) {
+		if (event.revents & (POLLIN | POLLERR | POLLHUP))
+			conn->onCgiClientEvent();
+		if (conn->isClosing())
+			return;
+	}
+
+	/* Conexão em CGI é ISENTA do timeout de ociosidade pq ela não está parada,
+	está esperando o filho que tem o prazo próprio cobrado no checkCgi() */
+	if (conn->getState() != CGI_RUNNING
+		&& now - conn->getLastActivity() >= CONNECTION_TIMEOUT)
 		conn->onTimeout();
 	if (conn->isClosing())
 		return;
@@ -175,6 +223,17 @@ void	EventLoop::handleConnectionEvent(const pollfd& event, std::time_t now) {
 		conn->onReadable();
 	if ((event.revents & POLLOUT) && !conn->isClosing() && conn->hasPendingWrite())
 		conn->onWritable();
+}
+
+/* checar o EOF antes do stdout fechar na próxima volta, nenhum fd do CGI está
+no poll pra acordar o loop. Por isso o waitpid e a cobrança do prazo vem
+depois do despacho dos eventos, fechando o ciclo na mesma passada */
+void	EventLoop::pumpCgiConnections(std::time_t now) {
+	for (std::map<int, Connection*>::iterator it = _connections.begin();
+		it != _connections.end(); ++it) {
+		if (it->second->getState() == CGI_RUNNING && !it->second->isClosing())
+			it->second->checkCgi(now);
+	}
 }
 
 void	EventLoop::reapClosedConnections() {
