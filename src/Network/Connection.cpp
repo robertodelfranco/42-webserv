@@ -51,12 +51,15 @@ static bool	findHeader(const std::string& block, const std::string& name, std::s
 	return false;
 }
 
-static void	parseRequestLineProvisional(const std::string& headers, HttpRequest& req) {
+static bool	parseRequestLineProvisional(const std::string& headers, HttpRequest& req) {
 	size_t	firstLineLen = headers.find("\r\n");
 	std::string	firstLine = headers.substr(0, firstLineLen);
 
 	size_t	firstSpace = firstLine.find(' ');
 	size_t	secondSpace = firstLine.find_last_of(' ');
+
+	if (firstSpace == std::string::npos || secondSpace == firstSpace)
+		return false;
 
 	std::string	method = firstLine.substr(0, firstSpace);
 	std::string target = firstLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
@@ -68,6 +71,7 @@ static void	parseRequestLineProvisional(const std::string& headers, HttpRequest&
 	std::string	query = (cutInterr == std::string::npos) ? "" : target.substr(cutInterr + 1);
 
 	req.setRequestLineProvisional(method, path, query, version);
+	return true;
 }
 
 /* Mesma varredura do findHeader() acima, só que guardando todos os pares em
@@ -213,7 +217,8 @@ Connection::RequestStatus	Connection::checkRequestFraming() {
 		const std::string	headers = _readBuffer.substr(0, _headersEnd);
 		std::string			value;
 
-		parseRequestLineProvisional(headers, _request);
+		if (!parseRequestLineProvisional(headers, _request))
+			return REQ_BAD;
 		parseHeadersProvisional(headers, _request);
 
 		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked")

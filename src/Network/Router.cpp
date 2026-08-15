@@ -31,7 +31,9 @@ const Location* Router::matchLocation(const ServerConfig& server, const std::str
 	for(std::vector<Location>::const_iterator it = server.getLocations().begin();
 			it != server.getLocations().end(); it++) {
 		size_t	len = it->getPath().size();
-		bool	boundarys = (uri.size() == len) || (uri[len] == '/') || (it->getPath() == "/");
+
+		bool	boundarys = (uri.size() == len) || (len < uri.size() && uri[len] == '/')
+			|| (it->getPath() == "/");
 		if (uri.compare(0, len, it->getPath()) == 0 && boundarys && len > bestLen) {
 			bestLen = len;
 			best = &(*it);
@@ -92,9 +94,12 @@ std::string	Router::resolvePath(const Location& loc, const std::string& uriPath)
 	std::string	locRoot = loc.getRoot();
 	
 	// criar helpers startswith and endswith depois
-	if (locRoot.compare(locRoot.size() - 1, 1, "/") == 0 && uriPath.compare(0, 1, "/") == 0)
+	bool	rootEndsSlash = !locRoot.empty() && locRoot[locRoot.size() - 1] == '/';
+	bool	uriStartsSlash = !uriPath.empty() && uriPath[0] == '/';
+
+	if (rootEndsSlash && uriStartsSlash)
 		locRoot.append(uriPath.substr(1, uriPath.size()));
-	else if (locRoot.compare(locRoot.size() - 1, 1, "/") == 0 || uriPath.compare(0, 1, "/") == 0)
+	else if (rootEndsSlash || uriStartsSlash)
 		locRoot.append(uriPath);
 	else
 		locRoot.append("/").append(uriPath);
