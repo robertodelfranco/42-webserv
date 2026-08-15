@@ -3,5 +3,3 @@ webserv
 objs/
 .vscode/
 *.pdf
-*.md
-.*/

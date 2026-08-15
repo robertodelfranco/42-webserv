@@ -100,11 +100,6 @@ void	ServerConfig::addLocation(const Location& location) {
 	this->locations.push_back(location); // location já chega completo, montado localmente em getLocationBlock
 }
 
-void	ServerConfig::mergeLocationDefaults() {
-	for (size_t i = 0; i < this->locations.size(); ++i)
-		this->locations[i].mergeDefaults(*this);
-}
-
 const std::string&	ServerConfig::getRoot() const {
 	return this->root;
 }

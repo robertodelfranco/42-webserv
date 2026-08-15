@@ -33,19 +33,13 @@ class Router
 		static const Location* matchLocation(const ServerConfig& server,
 											 const std::string& uri);
 
-		/* classifica se é CGI, static, dir, erro */
+		/* classifica se é CGI, static, dir, erro */									 
 		static RouteType classify(const Location& loc, const HttpRequest& req);
-
-		/* o método da request está no "methods" deste location? A checagem é
-		do Connection porque a resposta é 405, não um handler diferente. */
-		static bool methodAllowed(const Location& loc, const HttpRequest& req);
 
 		/* instancia e retorna a subclasse correta de IRequestHandler!
 		esse é o famoso design pattern chamado de factory method */
 		static IRequestHandler* createHandler(const Location& loc,
 											  const HttpRequest& req);
-
-		static std::string resolvePath(const Location& loc, const std::string& uriPath);
 };
 
 #endif
