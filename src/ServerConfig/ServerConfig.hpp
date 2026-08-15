@@ -32,7 +32,6 @@ class ServerConfig {
 		void	setErrorPages(const std::vector<int>& error_pages, const std::string& path);
 		void	setIndexFiles(const std::vector<std::string>& index_pages);
 		void	addLocation(const Location& location); // adiciona um location já completo no vetor de locations
-		void	mergeLocationDefaults(); // roda o mergeDefaults só depois do server{} inteiro lido
 
 		const std::string&					getRoot() const;
 		const std::vector<Listen>&			getListens() const;

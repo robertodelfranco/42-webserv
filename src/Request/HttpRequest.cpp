@@ -21,7 +21,6 @@
 HttpRequest::HttpRequest()
 : method_(),
   path_(),
-  query_(),
   httpVersion_(),
   headers_(),
   body_()
@@ -31,7 +30,6 @@ HttpRequest::HttpRequest()
 HttpRequest::HttpRequest(const HttpRequest &other)
 : method_(other.method_),
   path_(other.path_),
-  query_(other.query_),
   httpVersion_(other.httpVersion_),
   headers_(other.headers_),
   body_(other.body_)
@@ -43,7 +41,6 @@ HttpRequest &HttpRequest::operator=(const HttpRequest &other)
     if (this != &other) {
         method_      = other.method_;
         path_        = other.path_;
-        query_       = other.query_;
         httpVersion_ = other.httpVersion_;
         headers_     = other.headers_;
         body_        = other.body_;
@@ -67,12 +64,6 @@ const std::string &HttpRequest::getMethod() const
 const std::string &HttpRequest::getPath() const
 {
     return path_;
-}
-
-// precisa separar path da query
-const std::string &HttpRequest::getQuery() const
-{
-    return query_;
 }
 
 const std::string &HttpRequest::getHTTPVersion() const
@@ -120,7 +111,7 @@ const std::string &HttpRequest::getBody() const
 APAGAR TUDO ISSO QUANDO CONCLUIR O CONFIG!!!!!!!!!!!! ------------------------*/
 
 HttpRequest::HttpRequest(const std::string &mock)
-: method_(), path_(), query_(), httpVersion_(), headers_(), body_()
+: method_(), path_(), httpVersion_(), headers_(), body_()
 {
 	if (mock == "MOCK1") {
 		method_				= "GET";
@@ -155,23 +146,4 @@ HttpRequest::HttpRequest(const std::string &mock)
 	}
 	else
 		exit(1);
-}
-
-void	HttpRequest::setRequestLineProvisional(const std::string& method, const std::string& path,
-										   const std::string& query, const std::string& version)
-{
-	method_			= method;
-	path_			= path;
-	query_			= query;
-	httpVersion_	= version;
-}
-
-void	HttpRequest::setHeaderProvisional(const std::string& key, const std::string& value)
-{
-	headers_[key] = value;
-}
-
-void	HttpRequest::setBodyProvisional(const std::string& body)
-{
-	body_ = body;
 }
