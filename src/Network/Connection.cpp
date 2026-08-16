@@ -1,12 +1,14 @@
 #include "Connection.hpp"
 #include "Socket.hpp"
 #include "Router.hpp"
-#include "iostream"
+#include <iostream>
 #include <cerrno>
 #include <cstdlib>
 #include <sstream>
 #include <poll.h>
 #include <sys/socket.h>
+#include "../Response/ResponseWriter.hpp"
+#include "../Utils/Color.hpp"
 #include "../Utils/Logger.hpp"
 #include "../Cgi/CgiProcess.hpp"
 #include "../Cgi/CgiOutputParser.hpp"
@@ -475,7 +477,11 @@ void	Connection::buildErrorResponse(int code) {
 	_keepAlive = false;
 
 	Logger::info() << "fd=" << _fd.get() << " -> " << phrase;
-	queueResponse("HTTP/1.1 " + phrase + "\r\nConnection: close\r\n\r\n" + phrase + "\n");
+	HttpResponse response;
+	response.setStatus(code);
+	response.setHeader("Connection", "close");
+	response.setBody(phrase + "\n");
+	queueResponse(ResponseWriter::write(response));
 }
 
 // ============================== CGI ==============================

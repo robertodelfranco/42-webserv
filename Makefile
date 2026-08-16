@@ -20,6 +20,11 @@ SRCS	=	main.cpp \
 			ServerConfig/ServerConfig.cpp \
 			ServerConfig/Location.cpp \
 			ServerConfig/Listen.cpp \
+			Response/Response.cpp \
+			Response/ErrorResponse.cpp \
+			Response/StaticHandler.cpp \
+			Response/ResponseHelpers.cpp \
+			Response/ResponseWriter.cpp \
 			Response/HttpResponse.cpp \
 			Request/HttpRequest.cpp \
 			Request/HttpParser.cpp \

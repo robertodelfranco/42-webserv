@@ -1,10 +1,14 @@
 #include "ErrorResponse.hpp"
 
+#include <sstream>
+
+#include "ResponseHelpers.hpp"
+
 ErrorResponse::ErrorResponse(int code, const std::string &custom_page){
 	setStatus(code);
-	if (!custom_page.empty() && setBodyFromFile(custom_page)) {
-	
-	}else{
+	std::string body;
+	if (!custom_page.empty() && ResponseHelpers::readFileToString(custom_page, body)) {
+	} else {
 		std::ostringstream ss;
 		ss	<< "<html><head><title>"
 			<< code << " " << statusMessageCode(code)
@@ -14,7 +18,8 @@ ErrorResponse::ErrorResponse(int code, const std::string &custom_page){
         ss << "<p>Server generated error page</p>";
         ss << "</body></html>";
 
-		setBody(ss.str());
+		body = ss.str();
 	}
+	setBody(body);
 	setCloseAfterSend(true);
 }
