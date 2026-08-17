@@ -3,9 +3,20 @@
 
 #include "Response.hpp"
 
+class ServerConfig;
+class Location;
+
 class ErrorResponse : public Response {
 	public:
-		ErrorResponse(int code, const std::string &custom_page = std::string());
+		explicit ErrorResponse(int code,
+							   const ServerConfig* server = NULL,
+							   const Location* loc = NULL);
+
+	private:
+		static std::string	configuredPage(int code,
+										   const ServerConfig* server,
+										   const Location* loc);
+		std::string			generatePage(int code) const;
 };
 
 #endif /* ERROR_RESPONSE_HPP */

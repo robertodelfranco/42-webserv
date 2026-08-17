@@ -71,20 +71,26 @@ namespace ResponseHelpers {
 			return false;
 
 		if (S_ISDIR(file_stat.st_mode)) {
-			std::string index_path = target_path;
-			if (!index_path.empty() && index_path[index_path.size() - 1] != '/')
-				index_path += '/';
-			if (location.getIndexFiles().empty())
-				return false;
-			index_path += location.getIndexFiles().front();
+			std::string dir_path = target_path;
+			if (!dir_path.empty() && dir_path[dir_path.size() - 1] != '/')
+				dir_path += '/';
 
-			if (stat(index_path.c_str(), &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
-				target_path = index_path;
-			} else if (location.getAutoIndex()) {
-				autoindex = true;
-			} else {
-				return false;
+			// o primeiro index que existir de verdade ganha
+			const std::vector<std::string> &indexes = location.getIndexFiles();
+			for (size_t i = 0; i < indexes.size(); ++i) {
+				std::string index_path = dir_path + indexes[i];
+
+				if (stat(index_path.c_str(), &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
+					target_path = index_path;
+					return true;
+				}
 			}
+
+			// nenhum index serviu, so a listagem salva
+			if (!location.getAutoIndex())
+				return false;
+			target_path = dir_path;
+			autoindex = true;
 		}
 
 		return true;
@@ -96,9 +102,18 @@ namespace ResponseHelpers {
 			return "application/octet-stream";
 
 		std::string ext = path.substr(dot);
-		if (ext == ".html") return "text/html";
+		if (ext == ".html" || ext == ".htm") return "text/html";
 		if (ext == ".css") return "text/css";
 		if (ext == ".js") return "application/javascript";
+		if (ext == ".json") return "application/json";
+		if (ext == ".xml") return "application/xml";
+		if (ext == ".txt") return "text/plain";
+		if (ext == ".png") return "image/png";
+		if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
+		if (ext == ".gif") return "image/gif";
+		if (ext == ".svg") return "image/svg+xml";
+		if (ext == ".ico") return "image/x-icon";
+		if (ext == ".pdf") return "application/pdf";
 		return "application/octet-stream";
 	}
 
