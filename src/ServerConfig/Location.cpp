@@ -1,8 +1,21 @@
 #include "Location.hpp"
 #include "ServerConfig.hpp"
+#include "../Response/ResponseHelpers.hpp"
 #include <stdexcept>
 #include <sys/stat.h>
 #include <unistd.h>
+
+size_t	methodToBit(const std::string& method) {
+	if (method == "GET")
+		return GET;
+	if (method == "POST")
+		return POST;
+	if (method == "DELETE")
+		return DELETE;
+	if (method == "HEAD")
+		return HEAD;
+	return 0;
+}
 
 Location::Location() : path_(""), root_(""), cgi_type_(""),
 	cgi_path_(""), index_files_(), error_page_(), redir_(),
@@ -12,8 +25,14 @@ Location::Location() : path_(""), root_(""), cgi_type_(""),
 void	Location::setPath(const std::string& path) {
 	if (path.empty())
 		throw std::runtime_error("Location: path is required");
+
 	if (path[0] != '/')
 		throw std::runtime_error("Location: path must start with '/' '" + path + "'");
+
+	if (path != "/" && path[path.size() - 1] == '/') {
+		this->path_ = path.substr(0, path.size() - 1);
+		return ;
+	}
 
 	this->path_ = path;
 }
@@ -21,14 +40,17 @@ void	Location::setPath(const std::string& path) {
 void	Location::setRoot(const std::string& root) {
 	if (root.empty())
 		throw std::runtime_error("Root: path is required");
+
 	if (root[0] != '/' && root[0] != '.')
 		throw std::runtime_error("Root: path must start with '/' (absolute) or './' (relative) '" + root + "'");
 
 	struct stat info;
 	if (stat(root.c_str(), &info) != 0)
 		throw std::runtime_error("Root: path does not exist '" + root + "'");
+
 	if (!S_ISDIR(info.st_mode))
 		throw std::runtime_error("Root: path is not a directory '" + root + "'");
+
 	if (access(root.c_str(), R_OK) != 0)
 		throw std::runtime_error("Root: no read permission on '" + root + "'");
 
@@ -38,6 +60,7 @@ void	Location::setRoot(const std::string& root) {
 void	Location::setBodySize(long long size) {
 	if (size < 0)
 		throw std::runtime_error("Body size cannot be negative");
+
 	this->client_max_body_size_ = size;
 }
 
@@ -51,9 +74,8 @@ void	Location::setErrorPages(const std::vector<int>& error_pages, const std::str
 	if (path[0] != '/' && path[0] != '.')
 		throw std::runtime_error("Error page: path must start with '/' (absolute) or './' (relative) '" + path + "'");
 
-	for (size_t i = 0; i < error_pages.size(); ++i) {
+	for (size_t i = 0; i < error_pages.size(); ++i)
 		this->error_page_.insert(std::make_pair(error_pages[i], path));
-	}
 }
 
 void	Location::setIndexFiles(const std::vector<std::string>& index_pages) {
@@ -69,15 +91,10 @@ void	Location::setMethods(const std::vector<std::string>& methods) {
 
 	size_t allow_methods = 0;
 	for (size_t i = 0; i < methods.size(); ++i) {
-		std::string method = methods[i]; // create 'to upper' function later
-		if (method == "GET")
-			allow_methods |= GET;
-		else if (method == "POST")
-			allow_methods |= POST;
-		else if (method == "DELETE")
-			allow_methods |= DELETE;
-		else
+		size_t	bit = methodToBit(methods[i]); // create 'to upper' function later
+		if (bit == 0)
 			throw std::runtime_error("Methods: invalid method '" + methods[i] + "'");
+		allow_methods |= bit;
 	}
 
 	this->allow_methods_ = allow_methods;
@@ -102,14 +119,17 @@ void	Location::setAutoindex(bool value) {
 void	Location::setUploadPath(const std::string& path) {
 	if (path.empty())
 		throw std::runtime_error("Upload path: path is required");
+
 	if (path[0] != '/' && path[0] != '.')
 		throw std::runtime_error("Upload path: path must start with '/' (absolute) or './' (relative) '" + path + "'");
 
 	struct stat info;
 	if (stat(path.c_str(), &info) != 0)
 		throw std::runtime_error("Upload path: path does not exist '" + path + "'");
+
 	if (!S_ISDIR(info.st_mode))
 		throw std::runtime_error("Upload path: path is not a directory '" + path + "'");
+
 	if (access(path.c_str(), W_OK) != 0)
 		throw std::runtime_error("Upload path: no write permission on '" + path + "'");
 
@@ -118,13 +138,17 @@ void	Location::setUploadPath(const std::string& path) {
 
 void	Location::mergeDefaults(const ServerConfig& server) {
 	if (this->root_.empty())
-		this->root_ = server.getRoot();
+		this->root_ = ResponseHelpers::joinPath(server.getRoot(), path_);
+
 	if (this->index_files_.empty())
 		this->index_files_ = server.getIndexFiles();
+
 	if (this->error_page_.empty())
 		this->error_page_ = server.getErrorPages();
+
 	if (this->client_max_body_size_ < 0)
 		this->client_max_body_size_ = server.getBodySize();
+
 }
 
 const std::string&	Location::getPath() const {

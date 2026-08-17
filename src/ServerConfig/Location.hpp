@@ -9,10 +9,15 @@
 enum Methods {
 	GET = 1,
 	POST = 2,
-	DELETE = 4
+	DELETE = 4,
+	HEAD = 8
 };
 
-class ServerConfig; // forward declaration pq ServerConfig.hpp já inclui Location.hpp
+/* Mora aqui pra existir uma tabela dessas no servidor inteiro, config,
+router e handlers precisam concordar sobre o que cada bit vale */
+size_t	methodToBit(const std::string& method);
+
+class ServerConfig;
 
 class Location {
 	private:
