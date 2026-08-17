@@ -1,9 +1,10 @@
 #include "StaticHandler.hpp"
-
+#include "../Network/Connection.hpp"
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
 #include <unistd.h>
+
 
 StaticHandler::StaticHandler(const HttpRequest &req, const Location &loc)
 	: request(req), location(loc) {}
@@ -101,8 +102,11 @@ Response StaticHandler::handlePOST(){
 	if (body_size > static_cast<size_t>(location.getClientMaxBodySize()))
 		return ErrorResponse(PAYLOAD_TOO_LARGE);
 
+	/* O location aceita POST no methods, mas nao tem upload_path: nao ha
+	onde gravar. Isso e config dizendo "aqui nao se escreve", nao falha do
+	servidor, entao 405 e nao 500. */
 	if (location.getUploadPath().empty())
-		return ErrorResponse(INTERNAL_SERVER_ERROR);
+		return ErrorResponse(METHOD_NOT_ALLOWED);
 
 	std::string file_name = ResponseHelpers::extractFileName(request.getPath());
 	if (file_name.empty())
@@ -160,4 +164,21 @@ Response StaticHandler::build() {
 	if (method == "DELETE") return handleDELETE();
 
 	return handleMethodAllowed();
+}
+
+bool	StaticHandler::handle(const HttpRequest& req, const Location& loc, Connection& conn) {
+	(void)req;
+	(void)loc;
+
+	Response resp = build();
+
+	/* O erro volta pra Connection so como código, não como pagina pronta.
+	Quem monta a página é o ErrorResponse, que conhece o error_page da
+	config. Assim um 404 do estático e um 404 do CGI saem identicos. */
+	if (resp.getStatus() >= 400)
+		conn.buildErrorResponse(resp.getStatus());
+	else
+		conn.sendResponse(resp);
+
+	return true;
 }
