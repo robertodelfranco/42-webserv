@@ -7,7 +7,7 @@
 #include "../ServerConfig/ServerConfig.hpp"
 #include "../Request/HttpRequest.hpp"
 #include "../Request/HttpParser.hpp"
-#include "../Response/HttpResponse.hpp"
+#include "../Response/Response.hpp"
 
 class CgiProcess;
 
@@ -55,8 +55,12 @@ class Connection {
 		no escopo de Connection. eu só não sei ainda se é pra instanciar o 
 		eles precisam ter o método clear() para o keep-alive funcionar. (edu) */
 		HttpRequest			_request;      // request JÁ parseada
-		HttpResponse		_response;     // resposta a ser enviada
+		Response			_response;     // última resposta entregue ao sendResponse
 		State				_state;
+
+		/* Location casado desta request, NULL fora do ciclo de uma request, agora é
+		guardado aqui pq buildErrorResponse precisa dele pra achar o error_page certo. */
+		const Location*		_matchedLoc;
 
 		/* NULL quando não há CGI rodando. O CgiHandler é deletado logo depois
 		do handle(), então ele passa a posse do processo pra cá antes de morrer,
@@ -108,11 +112,18 @@ class Connection {
 		void			onReadable();   // recv() do que estiver disponível -> _readBuffer
 		void			onWritable();   // send() do que sobrar em _writeBuffer, descontando o enviado
 
-		// é por aqui que os IRequestHandler entregam o que produziram.
-		// o handleRequest() passa a chamar queueResponse(_response.toString())
+		/* é por aqui que os IRequestHandler entregam o que produziram.
+		A Connection não monta nada, só serializa e decide o keep-alive
+		(a resposta pode exigir fechar via setCloseAfterSend) */
+		void			sendResponse(const Response& resp);
+
+		/* Só o CGI usa, porque a saída do script já vem pronta do
+		CgiOutputParser e passar por Response perderia headers repetidos
+		Quando HttpResponse aceitar headers multi-valor, o CGI migra pro
+		sendResponse e isso some */
 		void			queueResponse(const std::string& raw);
 
-		// os handlers respondem erro por aqui (o CGI usa pra 404/403/502/504)
+		/* Erro por código, quem monta a página agora é o ErrorResponse */
 		void			buildErrorResponse(int code);
 
 		// para acessar o estado do request pelo handler

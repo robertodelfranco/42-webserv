@@ -7,7 +7,7 @@
 #include <sstream>
 #include <poll.h>
 #include <sys/socket.h>
-#include "../Response/ResponseWriter.hpp"
+#include "../Response/ErrorResponse.hpp"
 #include "../Utils/Color.hpp"
 #include "../Utils/Logger.hpp"
 #include "../Cgi/CgiProcess.hpp"
@@ -148,7 +148,7 @@ Connection::Connection(int fd, const ServerConfig* candidate)
 : _fd(fd), _readBuffer(), _headersEnd(std::string::npos), _bodyExpected(-1),
   _requestEnd(0), _chunked(false), _keepAlive(false), _writeBuffer(),
   _writeOffset(0), _candidate(candidate), _lastActivity(std::time(NULL)),
-  _parser(), _request(), _response(), _state(READING), _cgi(NULL) {
+  _parser(), _request(), _response(), _state(READING), _matchedLoc(NULL), _cgi(NULL) {
 	Socket::setNonBlocking(_fd.get());
 }
 
@@ -281,6 +281,8 @@ void	Connection::resetForNextRequest() {
 	_writeBuffer.clear();
 	_writeOffset = 0;
 	_request = HttpRequest();
+	_response = Response();
+	_matchedLoc = NULL;
 	_parser = HttpParser();
 	_lastActivity = std::time(NULL); // nova janela de ociosidade
 	_state = READING;
@@ -385,32 +387,33 @@ void	Connection::onWritable() {
 void	Connection::handleRequest() {
 	// Logger::info() << "fd=" << _fd.get() << " " << _request.getMethod() << " " << _request.getPath();
 	_state = PROCESSING;
-	const Location* matchedLoc = Router::matchLocation(*_candidate, _request.getPath());
 
-	if (!matchedLoc) {
-		Logger::debug() << "CAINDO NO !mathedLoc";
+	_matchedLoc = Router::matchLocation(*_candidate, _request.getPath());
+
+	if (!_matchedLoc) {
 		buildErrorResponse(404);
 		return ;
 	}
 
 	// método barrado pela config é 405, e é decidido antes de escolher handler
-	if (!Router::methodAllowed(*matchedLoc, _request)) {
+	if (!Router::methodAllowed(*_matchedLoc, _request)) {
 		Logger::warning() << "fd=" << _fd.get() << " metodo " << _request.getMethod()
-			<< " nao permitido em " << matchedLoc->getPath();
+			<< " nao permitido em " << _matchedLoc->getPath();
 		buildErrorResponse(405);
 		return ;
 	}
 
-	IRequestHandler* handler = Router::createHandler(*matchedLoc, _request);
+	IRequestHandler* handler = Router::createHandler(*_matchedLoc, _request);
 	if (!handler) {
-		Logger::debug() << "CAINDO NO !handler";
-		buildErrorResponse(500); // nenhum handler soube tratar
+		Logger::error() << "fd=" << _fd.get() << " nenhum handler para "
+			<< _request.getPath();
+		buildErrorResponse(500);
 		return ;
 	}
 
 	bool isDone = false;
 	try {
-		isDone = handler->handle(_request, *matchedLoc, *this);
+		isDone = handler->handle(_request, *_matchedLoc, *this);
 	} catch (const std::exception& e) {
 		Logger::error() << "fd=" << _fd.get() << " handler lançou: " << e.what();
 		delete handler;
@@ -424,11 +427,12 @@ void	Connection::handleRequest() {
 		return ;
 	}
 
-	// quando a classe de Response existir, aqui vira queueResponse(_response.toString()).
-	if (_writeOffset == _writeBuffer.size())
+	// O handler disse "terminei" mas não entregou nada pelo sendResponse ou
+	// queueResponse. É bug do handler, não do cliente, então erro interno
+	if (_state != WRITING) {
+		Logger::error() << "fd=" << _fd.get() << " handler terminou sem responder";
 		buildErrorResponse(500);
-	else
-		_state = WRITING;
+	}
 }
 
 State	Connection::getState() const {
@@ -445,43 +449,28 @@ void	Connection::queueResponse(const std::string& raw) {
 	_state = WRITING;
 }
 
-static const char*	errorPhrase(int code) {
-	switch (code) {
-		case 400:
-			return "400 - Bad Request";
-		case 403:
-			return "403 - Forbidden";
-		case 404:
-			return "404 - Not Found";
-		case 405:
-			return "405 - Method Not Allowed";
-		case 408:
-			return "408 - Request Timeout";
-		case 413:
-			return "413 - Content Too Large";
-		case 431:
-			return "431 - Request Header Fields Too Large";
-		case 502:
-			return "502 - Bad Gateway";
-		case 504:
-			return "504 - Gateway Timeout";
-		default:
-			return "500 - Internal Server Error";
-	}
+// Única saída de resposta do servidor. A Connection não decide status, 
+// ela recebe o Response pronto, resolve o keep-alive e serializa.
+void	Connection::sendResponse(const Response& resp) {
+	_response = resp;
+
+	// a resposta pode EXIGIR fechar (erro), mas nunca exigir manter aberto
+	// isso é decisão da conexão, tomada no decideKeepAlive() a partir da request
+	if (_response.getCloseAfterSend())
+		_keepAlive = false;
+	_response.setCloseAfterSend(!_keepAlive);
+
+	Logger::info() << "fd=" << _fd.get() << " -> " << _response.getStatus()
+		<< " " << _response.getStatusMessage() << " ("
+		<< _response.getBody().size() << " bytes)";
+
+	queueResponse(_response.toString());
 }
 
-// resposta chumbada por enquanto para funcionar os testers e o servidor
+/* Só traduz o código na resposta, quem sabe montar página de erro é o ErrorResponse. 
+O _matchedLoc pode ser NULL nos erros de framing (parser) antes de casar o location */
 void	Connection::buildErrorResponse(int code) {
-	const std::string	phrase = errorPhrase(code);
-
-	_keepAlive = false;
-
-	Logger::info() << "fd=" << _fd.get() << " -> " << phrase;
-	HttpResponse response;
-	response.setStatus(code);
-	response.setHeader("Connection", "close");
-	response.setBody(phrase + "\n");
-	queueResponse(ResponseWriter::write(response));
+	sendResponse(ErrorResponse(code, _candidate, _matchedLoc));
 }
 
 // ============================== CGI ==============================

@@ -1,26 +1,12 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   Router.cpp                                         :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/07/26 11:15:30 by eduribei          #+#    #+#             */
-/*   Updated: 2026/07/26 12:22:36 by eduribei         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 #include "Router.hpp"
 #include "../Handlers/CgiHandler.hpp"
 #include "../Utils/Logger.hpp"
+#include "../Response/StaticHandler.hpp"
+#include "../Response/ResponseHelpers.hpp"
 
-Router::Router()
-{
-}
+Router::Router() {}
 
-Router::~Router()
-{
-}
+Router::~Router() {}
 
 /* qual bloco Location do ServerConfig melhor se encaixa na URI */
 const Location* Router::matchLocation(const ServerConfig& server, const std::string& uri)
@@ -40,7 +26,7 @@ const Location* Router::matchLocation(const ServerConfig& server, const std::str
 		}
 	}
 	if (best)
-		Logger::info() << "BEST " << best->getPath();
+		Logger::debug() << "location casado: " << best->getPath() << " para " << uri;
 	return best;
 }
 
@@ -52,6 +38,9 @@ static size_t	methodBit(const std::string& method) {
 		return POST;
 	if (method == "DELETE")
 		return DELETE;
+	/* HEAD é um GET sem body, quem libera GET libera HEAD */
+	if (method == "HEAD")
+		return GET;
 	return 0;
 }
 
@@ -66,13 +55,11 @@ RouteType Router::classify(const Location& loc, const HttpRequest& req) {
 	const std::string&	cgi_type = loc.getCgiType();
 	const std::string&	path = req.getPath();
 
-	Logger::info() << "CLASSIFY " << path << " " << cgi_type;
 	if (!cgi_type.empty() && path.size() >= cgi_type.size()
 			&& path.compare(path.size() - cgi_type.size(), cgi_type.size(), cgi_type) == 0)
 		return CGI;
 
-	// por enquanto cai no 500 até ter o static handler, upload e etc.
-	return ERROR;
+	return STATIC;
 }
 
 /* instancia e retorna a subclasse correta de IRequestHandler!
@@ -81,28 +68,15 @@ IRequestHandler* Router::createHandler(const Location& loc, const HttpRequest& r
 {
 	switch (classify(loc, req)) {
 		case CGI:
-			Logger::info() << "CGI";
 			return new CgiHandler();
-		
+		case STATIC:
+			return new StaticHandler(req, loc);
 		default:
 			return NULL;
 	}
-	return NULL;
 }
 
+// Delega pro joinPath para existir UMA implementacao dessa regra no servidor inteiro
 std::string	Router::resolvePath(const Location& loc, const std::string& uriPath) {
-	std::string	locRoot = loc.getRoot();
-	
-	// criar helpers startswith and endswith depois
-	bool	rootEndsSlash = !locRoot.empty() && locRoot[locRoot.size() - 1] == '/';
-	bool	uriStartsSlash = !uriPath.empty() && uriPath[0] == '/';
-
-	if (rootEndsSlash && uriStartsSlash)
-		locRoot.append(uriPath.substr(1, uriPath.size()));
-	else if (rootEndsSlash || uriStartsSlash)
-		locRoot.append(uriPath);
-	else
-		locRoot.append("/").append(uriPath);
-	
-	return locRoot;
+	return ResponseHelpers::joinPath(loc.getRoot(), uriPath);
 }
