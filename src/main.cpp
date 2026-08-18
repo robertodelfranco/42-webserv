@@ -15,7 +15,13 @@ static const char*	resolveConfigPath(int ac, char **av)
 int main(int ac, char **av)
 {
 	signal(SIGPIPE, SIG_IGN);
-	Logger::setLevel(Logger::DEBUG);
+
+	// nivel default é INFO, WEBSERV_LOG_LEVEL=debug religa o debug sem
+	// precisar de flag (o subject só aceita ./webserv [config])
+	const char*	levelEnv = std::getenv("WEBSERV_LOG_LEVEL");
+	if (!levelEnv || !Logger::setLevelFromString(levelEnv))
+		Logger::setLevel(Logger::INFO);
+
 	if (ac > 2) {
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
 		return 1;

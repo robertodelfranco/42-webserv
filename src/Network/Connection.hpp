@@ -14,7 +14,7 @@ class CgiProcess;
 // Uma conexão em CGI_RUNNING é ISENTA disso pq ela não 
 // está ociosa, está esperando o filho (que tem o
 // prazo próprio dele, CGI_TIMEOUT)
-#define CONNECTION_TIMEOUT 30
+#define CONNECTION_TIMEOUT 90
 
 /* ESSE ENUM VAMOS USAR PARA REPRESENTAR O ESTADO DA CONEXÃO. */
 enum State {

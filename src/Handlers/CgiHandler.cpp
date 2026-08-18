@@ -60,6 +60,13 @@ std::vector<std::string>	CgiHandler::buildEnv(const HttpRequest& req,
 
 	env.push_back("QUERY_STRING=" + req.getQuery());
 
+	/* REQUEST_URI é o alvo original da request (path + query). CGIs escritos
+	sobre net/http reconstroem a URL com HTTP_HOST + REQUEST_URI, entao sem
+	ele, a URL sai vazia e o script rejeita o PATH_INFO. */
+	// pego no teste do subject
+	env.push_back("REQUEST_URI=" + req.getPath()
+		+ (req.getQuery().empty() ? "" : "?" + req.getQuery()));
+
 	env.push_back("REDIRECT_STATUS=200");
 
 	const std::string&	body = req.getBody();
