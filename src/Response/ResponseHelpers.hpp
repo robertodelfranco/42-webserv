@@ -8,6 +8,7 @@ class Location;
 
 namespace ResponseHelpers {
 	std::string joinPath(const std::string &root, const std::string &path);
+	std::string	resolveUriPath(const Location& loc, const std::string& uriPath); // corta o prefixo de location da uri
 	bool readFileToString(const std::string &path, std::string &content);
 	std::string buildAutoindexHtml(const std::string &dir_path, const std::string &request_path);
 	bool resolveTargetPath(const HttpRequest &request, const Location &location, std::string &target_path, bool &autoindex);

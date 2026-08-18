@@ -30,22 +30,8 @@ const Location* Router::matchLocation(const ServerConfig& server, const std::str
 	return best;
 }
 
-/* bitmask usado aqui, 0 = método desconhecido */
-static size_t	methodBit(const std::string& method) {
-	if (method == "GET")
-		return GET;
-	if (method == "POST")
-		return POST;
-	if (method == "DELETE")
-		return DELETE;
-	/* HEAD é um GET sem body, quem libera GET libera HEAD */
-	if (method == "HEAD")
-		return GET;
-	return 0;
-}
-
 bool	Router::methodAllowed(const Location& loc, const HttpRequest& req) {
-	size_t	bit = methodBit(req.getMethod());
+	size_t	bit = methodToBit(req.getMethod()); // tabela única, mora na Location.hpp
 
 	return bit != 0 && (loc.getAllowMethods() & bit) != 0;
 }
@@ -76,7 +62,7 @@ IRequestHandler* Router::createHandler(const Location& loc, const HttpRequest& r
 	}
 }
 
-// Delega pro joinPath para existir UMA implementacao dessa regra no servidor inteiro
+// Delega pro resolveUriPath para existir UMA implementacao dessa regra no servidor inteiro
 std::string	Router::resolvePath(const Location& loc, const std::string& uriPath) {
-	return ResponseHelpers::joinPath(loc.getRoot(), uriPath);
+	return ResponseHelpers::resolveUriPath(loc, uriPath);
 }

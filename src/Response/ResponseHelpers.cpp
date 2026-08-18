@@ -21,6 +21,12 @@ namespace ResponseHelpers {
 		return root + path;
 	}
 
+	std::string	resolveUriPath(const Location& loc, const std::string& uriPath) {
+		const std::string	path = uriPath.substr(loc.getPath().size());
+
+		return joinPath(loc.getRoot(), path);
+	}
+
 	bool readFileToString(const std::string &path, std::string &content) {
 		std::ifstream ifs(path.c_str(), std::ios::in | std::ios::binary);
 		if (!ifs)
@@ -64,7 +70,7 @@ namespace ResponseHelpers {
 
 	bool resolveTargetPath(const HttpRequest &request, const Location &location, std::string &target_path, bool &autoindex) {
 		autoindex = false;
-		target_path = joinPath(location.getRoot(), request.getPath());
+		target_path = resolveUriPath(location, request.getPath());
 
 		struct stat file_stat;
 		if (stat(target_path.c_str(), &file_stat) == -1)
