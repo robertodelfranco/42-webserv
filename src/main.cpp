@@ -16,12 +16,8 @@ int main(int ac, char **av)
 {
 	signal(SIGPIPE, SIG_IGN);
 
-	// nivel default é INFO, WEBSERV_LOG_LEVEL=debug religa o debug sem
-	// precisar de flag (o subject só aceita ./webserv [config])
-	const char*	levelEnv = std::getenv("WEBSERV_LOG_LEVEL");
-	if (!levelEnv || !Logger::setLevelFromString(levelEnv))
-		Logger::setLevel(Logger::INFO);
-
+	Logger::setLevel(Logger::DEBUG); // muda pra info aqui e todos os prints de debug somem automaticamente
+	
 	if (ac > 2) {
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
 		return 1;

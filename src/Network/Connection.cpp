@@ -20,6 +20,10 @@
 // Mesmo valor que o nginx usa (large_client_header_buffers).
 static const size_t	MAX_HEADER_SIZE = 8192;
 
+// 4096 gerava syscall demais em corpo grande (recv/send de 100MB em CGI).
+// Não muda a semântica, só quantos bytes por volta do poll().
+static const size_t	IO_BUFFER_SIZE = 65536;
+
 /* ========================= framing provisório =========================
 Esses helpers e o checkRequestFraming() SAEM DAQUI quando o HttpParser
 tiver um feed(), Connection não deve conhecer de HTTP em nenhum momento (Roberto)
@@ -332,7 +336,7 @@ void	Connection::onReadable() {
 	if (!wantsRead())
 		return;
 
-	char	buf[4096];
+	char	buf[IO_BUFFER_SIZE];
 	ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
 
 	if (n < 0) {
@@ -578,7 +582,7 @@ void	Connection::dropCgi() {
 }
 
 void	Connection::onCgiClientEvent() {
-	char	buf[4096];
+	char	buf[IO_BUFFER_SIZE];
 	ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
 
 	if (n > 0) {
