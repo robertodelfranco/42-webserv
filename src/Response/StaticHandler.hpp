@@ -20,7 +20,6 @@ class StaticHandler : public IRequestHandler {
 		Response handleMethodAllowed();
 
 		bool isMethodAllowed(const std::string &method) const;
-		Methods methodToEnum(const std::string &method) const;
 
 	public:
 		StaticHandler(const HttpRequest &req, const Location &loc);

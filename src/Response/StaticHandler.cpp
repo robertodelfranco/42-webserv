@@ -10,19 +10,11 @@ StaticHandler::StaticHandler(const HttpRequest &req, const Location &loc)
 	: request(req), location(loc) {}
 
 bool StaticHandler::isMethodAllowed(const std::string &method) const {
-	if (method == "HEAD")
-		return (location.getAllowMethods() & GET) != 0;
-	Methods m = methodToEnum(method);
-	if (m == 0)
-		return false;
-	return (location.getAllowMethods() & m) != 0;
-}
+	size_t bit = methodToBit(method); // tabela única, mora na Location.hpp agora
 
-Methods StaticHandler::methodToEnum(const std::string &method) const {
-	if (method == "GET") return GET;
-	if (method == "POST") return POST;
-	if (method == "DELETE") return DELETE;
-	return static_cast<Methods>(0);
+	if (bit == 0)
+		return false;
+	return (location.getAllowMethods() & bit) != 0;
 }
 
 Response StaticHandler::handleGET(){
@@ -131,7 +123,7 @@ Response StaticHandler::handlePOST(){
 
 Response StaticHandler::handleDELETE() {
 	Response resp;
-	std::string file_path = ResponseHelpers::joinPath(location.getRoot(), request.getPath());
+	std::string file_path = ResponseHelpers::resolveUriPath(location, request.getPath());
 
 	struct stat file_stat;
 	if (stat(file_path.c_str(), &file_stat) == -1)

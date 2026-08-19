@@ -8,10 +8,10 @@
 #include "../Network/FileDescriptor.hpp"
 
 // Sem isso um CGI maluco (while True: print) enche a RAM do servidor
-#define CGI_MAX_OUTPUT (10 * 1024 * 1024)
+#define CGI_MAX_OUTPUT (300 * 1024 * 1024) // reveja isso depois
 
 // timeout próprio do cgi
-#define CGI_TIMEOUT 10
+#define CGI_TIMEOUT 600
 
 class CgiProcess {
 	public:

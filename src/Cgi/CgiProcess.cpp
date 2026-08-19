@@ -5,6 +5,10 @@
 #include <signal.h>
 #include <sys/wait.h>
 
+// mesmo raciocinio do IO_BUFFER_SIZE da Connection: 8192 gerava syscall
+// demais lendo o stdout de um CGI grande (echo de 100MB no cgi_tester)
+static const size_t	CGI_READ_BUFFER_SIZE = 65536;
+
 CgiProcess::CgiProcess(const std::string& interpreter, const std::string& scriptPath,
 					   const std::string& workDir, const std::vector<std::string>& env,
 					   const std::string& body)
@@ -179,7 +183,7 @@ void	CgiProcess::onStdoutReadable() {
 	if (_stdoutFd.get() < 0)
 		return;
 
-	char	buf[8192];
+	char	buf[CGI_READ_BUFFER_SIZE];
 	ssize_t	n = read(_stdoutFd.get(), buf, sizeof(buf));
 
 	if (n <= 0) {

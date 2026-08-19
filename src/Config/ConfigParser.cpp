@@ -259,7 +259,7 @@ void	ConfigParser::getCgi(ServerConfig& server, Location* location_pointer, std:
 	if (cgi_extension.empty())
 		throw ConfigParseError("Empty CGI type value", it->line, it->col, it->value);
 
-	if (cgi_extension != ".py" && cgi_extension != ".php")
+	if (cgi_extension != ".py" && cgi_extension != ".bla" && cgi_extension != ".php")
 		throw ConfigParseError("Unsupported CGI type '" + cgi_extension + "'", it->line, it->col, it->value);
 
 	location_pointer->setCgi(cgi_extension);

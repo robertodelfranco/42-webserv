@@ -15,7 +15,9 @@ static const char*	resolveConfigPath(int ac, char **av)
 int main(int ac, char **av)
 {
 	signal(SIGPIPE, SIG_IGN);
-	Logger::setLevel(Logger::DEBUG);
+
+	Logger::setLevel(Logger::DEBUG); // muda pra info aqui e todos os prints de debug somem automaticamente
+	
 	if (ac > 2) {
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
 		return 1;

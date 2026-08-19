@@ -36,7 +36,7 @@ void	EventLoop::openListeners() {
 			Socket* listener = new Socket();
 			try {
 				listener->bind(listens[j].host, listens[j].port);
-				listener->listen(10); // REVER QUANTIDADE DEPOIS!!
+				listener->listen(128); // REVER QUANTIDADE DEPOIS!!
 				listener->setNonBlocking();
 			} catch (...) {
 				Logger::error() << "bind/listen em " << listens[j].host << ":" << listens[j].port << " falhou";
