@@ -127,9 +127,14 @@ void	Connection::resetForNextRequest() {
 		
 		RequestStatus status = _parser.feed(leftover.c_str(), leftover.size(), _candidate->getBodySize());
 		if (status == REQ_COMPLETE) {
-			_parser.parse(_request);
-			decideKeepAlive();
-			handleRequest();
+			try {
+				_parser.parse(_request);
+				decideKeepAlive();
+				handleRequest();
+			} catch (const std::exception& e) {
+				Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
+				buildErrorResponse(400);
+			}
 		} else if (status != REQ_INCOMPLETE) {
 			if (status == REQ_TOO_LARGE) buildErrorResponse(413);
 			else if (status == REQ_HEADERS_TOO_LARGE) buildErrorResponse(431);
@@ -168,9 +173,14 @@ void	Connection::onReadable() {
 		case REQ_INCOMPLETE:
 			break; // volta pro poll() e espera o resto chegar
 		case REQ_COMPLETE:
-			_parser.parse(_request);
-			decideKeepAlive();
-			handleRequest();
+			try {
+				_parser.parse(_request);
+				decideKeepAlive();
+				handleRequest();
+			} catch (const std::exception& e) {
+				Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
+				buildErrorResponse(400); 
+			}
 			break;
 		case REQ_TOO_LARGE:
 			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "

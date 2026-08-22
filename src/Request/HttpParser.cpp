@@ -6,7 +6,7 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/25 16:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2026/08/22 14:45:28 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/08/22 19:25:30 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -105,7 +105,8 @@ size_t HttpParser::requestEnd() const {
     return _requestEnd;
 }
 
-/* EDU (AUG22): O parse() agora só roda de verdade quando o feed() avisa que a request ta completa (_headersFilled e _requestEnd > 0). Nada de parsear pela metade! */
+/*	EDU (AUG22): O parse() agora só roda de verdade quando o feed() avisa
+	que a request ta completa (_headersFilled e _requestEnd > 0) */
 void HttpParser::parse(HttpRequest &req)
 {
     if (!_headersFilled || _requestEnd == 0)
