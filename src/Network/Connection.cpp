@@ -17,140 +17,21 @@
 # define MSG_NOSIGNAL 0
 #endif
 
-// Mesmo valor que o nginx usa (large_client_header_buffers).
-static const size_t	MAX_HEADER_SIZE = 8192;
 
 // 4096 gerava syscall demais em corpo grande (recv/send de 100MB em CGI).
 // Não muda a semântica, só quantos bytes por volta do poll().
 static const size_t	IO_BUFFER_SIZE = 65536;
 
-/* ========================= framing provisório =========================
-Esses helpers e o checkRequestFraming() SAEM DAQUI quando o HttpParser
-tiver um feed(), Connection não deve conhecer de HTTP em nenhum momento (Roberto)
-
-Esse bloco que preenche o _request INTEIRO porque o CGI precisa de tudo isso
-============================================================================ */
-static bool	findHeader(const std::string& block, const std::string& name, std::string& out) {
-	std::string::size_type	lineStart = block.find("\r\n");
-
-	if (lineStart == std::string::npos)
-		return false;
-	lineStart += 2;
-
-	while (lineStart < block.size()) {
-		std::string::size_type	lineEnd = block.find("\r\n", lineStart);
-		if (lineEnd == std::string::npos)
-			lineEnd = block.size();
-
-		std::string::size_type	colon = block.find(':', lineStart);
-		if (colon != std::string::npos && colon < lineEnd
-			&& toLower(block.substr(lineStart, colon - lineStart)) == name) {
-			std::string				value = block.substr(colon + 1, lineEnd - colon - 1);
-			std::string::size_type	begin = value.find_first_not_of(" \t");
-			std::string::size_type	end = value.find_last_not_of(" \t");
-
-			out = (begin == std::string::npos) ? "" : value.substr(begin, end - begin + 1);
-			return true;
-		}
-		lineStart = lineEnd + 2;
-	}
-	return false;
-}
-
-static bool	parseRequestLineProvisional(const std::string& headers, HttpRequest& req) {
-	size_t	firstLineLen = headers.find("\r\n");
-	std::string	firstLine = headers.substr(0, firstLineLen);
-
-	size_t	firstSpace = firstLine.find(' ');
-	size_t	secondSpace = firstLine.find_last_of(' ');
-
-	if (firstSpace == std::string::npos || secondSpace == firstSpace)
-		return false;
-
-	std::string	method = firstLine.substr(0, firstSpace);
-	std::string target = firstLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
-	std::string version = firstLine.substr(secondSpace + 1);
-
-	// corte no '?', é ele que vira o QUERY_STRING do CGI.
-	size_t	cutInterr = target.find("?");
-	std::string	path = (cutInterr == std::string::npos) ? target : target.substr(0, cutInterr);
-	std::string	query = (cutInterr == std::string::npos) ? "" : target.substr(cutInterr + 1);
-
-	req.setRequestLineProvisional(method, path, query, version);
-	return true;
-}
-
-/* Mesma varredura do findHeader() acima, só que guardando todos os pares em
-vez de procurar um. */
-static void	parseHeadersProvisional(const std::string& block, HttpRequest& req) {
-	std::string::size_type	lineStart = block.find("\r\n");
-
-	if (lineStart == std::string::npos)
-		return;
-	lineStart += 2;
-
-	while (lineStart < block.size()) {
-		std::string::size_type	lineEnd = block.find("\r\n", lineStart);
-		if (lineEnd == std::string::npos)
-			lineEnd = block.size();
-
-		std::string::size_type	colon = block.find(':', lineStart);
-		if (colon != std::string::npos && colon < lineEnd) {
-			std::string				name = toLower(block.substr(lineStart, colon - lineStart));
-			std::string				value = block.substr(colon + 1, lineEnd - colon - 1);
-			std::string::size_type	begin = value.find_first_not_of(" \t");
-			std::string::size_type	end = value.find_last_not_of(" \t");
-
-			req.setHeaderProvisional(name, (begin == std::string::npos)
-										   ? "" : value.substr(begin, end - begin + 1));
-		}
-		lineStart = lineEnd + 2;
-	}
-}
-
-/* Espelho do isValidChunkedBody() do parser */
-static std::string	decodeChunkedProvisional(const std::string& body) {
-	std::string	out;
-	size_t		pos = 0;
-
-	while (true) {
-		size_t	lineEnd = body.find("\r\n", pos);
-		if (lineEnd == std::string::npos)
-			break;
-
-		std::string	sizeHex = body.substr(pos, lineEnd - pos);
-		char		*end;
-		long		chunkSize = std::strtol(sizeHex.c_str(), &end, 16);
-
-		if (end == sizeHex.c_str() || chunkSize <= 0)
-			break; // chunk de tamanho 0 é o fim da lista
-
-		pos = lineEnd + 2;
-		if (pos + static_cast<size_t>(chunkSize) > body.size())
-			break;
-
-		out.append(body, pos, static_cast<size_t>(chunkSize));
-		pos += static_cast<size_t>(chunkSize) + 2; // pula o CRLF do fim do chunk
-	}
-	return out;
-}
-
-static bool	parseContentLength(const std::string& raw, long long& out) {
-	if (raw.empty() || raw.find_first_not_of("0123456789") != std::string::npos)
-		return false;
-
-	std::istringstream	iss(raw);
-	iss >> out;
-	return !iss.fail();
-}
-
-/* ======================= fim do framing ========================== */
+/*	EDU (AUG22): removi todas as funcoes soltas do framing provisorio.
+	aquela logica foi toda transferida pro HttpParser. */
 
 // Só guarda o fd (já aceito em outro lugar) e a lista de Server
 // candidatos desse endpoint, nenhuma leitura/escrita acontece aqui.
+
+/*	EDU (AUG22): Tirei as variáveis de controle de estado do request
+	(headersEnd, bodyExpected, etc). O parser agora cuida do proprio estado */
 Connection::Connection(int fd, const ServerConfig* candidate)
-: _fd(fd), _readBuffer(), _headersEnd(std::string::npos), _bodyExpected(-1),
-  _requestEnd(0), _chunked(false), _keepAlive(false), _writeBuffer(),
+: _fd(fd), _readBuffer(), _keepAlive(false), _writeBuffer(),
   _writeOffset(0), _candidate(candidate), _lastActivity(std::time(NULL)),
   _parser(), _request(), _response(), _state(READING), _matchedLoc(NULL), _cgi(NULL) {
 	Socket::setNonBlocking(_fd.get());
@@ -206,66 +87,6 @@ void	Connection::onTimeout() {
 	_lastActivity = std::time(NULL);
 }
 
-// Decide se o _readBuffer já contém uma request inteira. É chamada depois de
-// cada recv, depois de achado o fim dos headers, _headersEnd/_bodyExpected 
-// ficam guardados e não recalculamos mais nada.
-// FUNÇÃO PROVISÓRIA
-Connection::RequestStatus	Connection::checkRequestFraming() {
-	if (_headersEnd == std::string::npos) {
-		_headersEnd = _readBuffer.find("\r\n\r\n");
-		if (_headersEnd == std::string::npos) {
-			if (_readBuffer.size() > MAX_HEADER_SIZE)
-				return REQ_HEADERS_TOO_LARGE;
-			return REQ_INCOMPLETE;
-		}
-		_headersEnd += 4; // agora aponta pro primeiro byte do body
-
-		const std::string	headers = _readBuffer.substr(0, _headersEnd);
-		std::string			value;
-
-		if (!parseRequestLineProvisional(headers, _request))
-			return REQ_BAD;
-		parseHeadersProvisional(headers, _request);
-
-		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked")
-			_chunked = true;
-		else if (findHeader(headers, "content-length", value)) {
-			if (!parseContentLength(value, _bodyExpected))
-				return REQ_BAD;
-		}
-		else
-			_bodyExpected = 0; // sem nenhum dos dois headers = sem body (GET, DELETE)
-	}
-
-	const long long	limit = _candidate->getBodySize();
-	const long long	bodySoFar = static_cast<long long>(_readBuffer.size() - _headersEnd);
-
-	if (_chunked) {
-		// Provisóriamente, desmembrar os chunks é trabalho do HttpParser.
-		if (bodySoFar > limit)
-			return REQ_TOO_LARGE;
-		if (_readBuffer.compare(_headersEnd, 5, "0\r\n\r\n") == 0) {
-			_requestEnd = _headersEnd + 5;
-			return REQ_COMPLETE;
-		}
-		std::string::size_type	last = _readBuffer.find("\r\n0\r\n\r\n", _headersEnd);
-		if (last != std::string::npos) {
-			_requestEnd = last + 7;
-			return REQ_COMPLETE;
-		}
-		return REQ_INCOMPLETE;
-	}
-
-	if (_bodyExpected > limit)
-		return REQ_TOO_LARGE;
-	if (bodySoFar >= _bodyExpected) {
-		// o resetForNextRequest() vai preservar os bytes recebidos a mais
-		_requestEnd = _headersEnd + static_cast<size_t>(_bodyExpected);
-		return REQ_COMPLETE;
-	}
-	return REQ_INCOMPLETE;
-}
-
 void	Connection::decideKeepAlive() {
 	const std::string	value = toLower(_request.getHeader("connection"));
 
@@ -277,11 +98,6 @@ void	Connection::decideKeepAlive() {
 }
 
 void	Connection::resetForNextRequest() {
-	_readBuffer.erase(0, _requestEnd);
-	_headersEnd = std::string::npos;
-	_bodyExpected = -1;
-	_requestEnd = 0;
-	_chunked = false;
 	_writeBuffer.clear();
 	_writeOffset = 0;
 	_request = HttpRequest();
@@ -300,35 +116,25 @@ void	Connection::resetForNextRequest() {
 
 	Logger::debug() << "fd=" << _fd.get() << " keep-alive: pronto pra proxima ("
 		<< _readBuffer.size() << " bytes ja no buffer)";
-}
 
-void	Connection::processReadBuffer() {
-	// Integração final esperada é _parser.feed(...) no lugar do framing.
-	switch (checkRequestFraming()) {
-		case REQ_INCOMPLETE:
-			break; // volta pro poll() e espera o resto chegar
-		case REQ_COMPLETE: {
-			/* A request line e os headers já foram preenchidos assim que o
-			bloco de headers fechou, o body só dá pra recortar agora, que é
-			quando o _requestEnd existe. Chunked entra decodificado. */
-			const std::string	body = _readBuffer.substr(_headersEnd, _requestEnd - _headersEnd);
-
-			_request.setBodyProvisional(_chunked ? decodeChunkedProvisional(body) : body);
+	/*	EDU (AUG22): isso daqui precisa ficar porque resolvemos manter o
+		pipelining. se sobrar lixo no _readBuffer (pipelining), a gente
+		ja joga pro parser de novo pra garantir que a proxima request
+		continue de onde parou.  */
+	if (!_readBuffer.empty()) {
+		std::string leftover = _readBuffer;
+		_readBuffer.clear();
+		
+		RequestStatus status = _parser.feed(leftover.c_str(), leftover.size(), _candidate->getBodySize());
+		if (status == REQ_COMPLETE) {
+			_parser.parse(_request);
 			decideKeepAlive();
 			handleRequest();
-			break;
+		} else if (status != REQ_INCOMPLETE) {
+			if (status == REQ_TOO_LARGE) buildErrorResponse(413);
+			else if (status == REQ_HEADERS_TOO_LARGE) buildErrorResponse(431);
+			else buildErrorResponse(400);
 		}
-		case REQ_TOO_LARGE:
-			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
-				<< _candidate->getBodySize() << " bytes";
-			buildErrorResponse(413);
-			break;
-		case REQ_HEADERS_TOO_LARGE:
-			buildErrorResponse(431);
-			break;
-		case REQ_BAD:
-			buildErrorResponse(400);
-			break;
 	}
 }
 
@@ -351,11 +157,33 @@ void	Connection::onReadable() {
 	}
 
 	_lastActivity = std::time(NULL);
-	_readBuffer.append(buf, n);
-	Logger::debug() << "fd=" << _fd.get() << " recv " << n << " bytes (buffer "
-		<< _readBuffer.size() << ")";
+	Logger::debug() << "fd=" << _fd.get() << " recv " << n << " bytes";
 
-	processReadBuffer();
+	/*	Foi embora o checkRequestFraming(), agora usamos o feed() do HttpParser
+		pra saber se a request está completa. A conexao so repassa os bytes
+		crus e deixa a maquina de estados decidir o RequestStatus. */
+	RequestStatus status = _parser.feed(buf, n, _candidate->getBodySize());
+
+	switch (status) {
+		case REQ_INCOMPLETE:
+			break; // volta pro poll() e espera o resto chegar
+		case REQ_COMPLETE:
+			_parser.parse(_request);
+			decideKeepAlive();
+			handleRequest();
+			break;
+		case REQ_TOO_LARGE:
+			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
+				<< _candidate->getBodySize() << " bytes";
+			buildErrorResponse(413);
+			break;
+		case REQ_HEADERS_TOO_LARGE:
+			buildErrorResponse(431);
+			break;
+		case REQ_BAD:
+			buildErrorResponse(400);
+			break;
+	}
 }
 
 // Mesma regra do recv que só pode ler/enviar vigiado pelo poll()
@@ -383,10 +211,7 @@ void	Connection::onWritable() {
 	}
 
 	resetForNextRequest();
-	if (!_readBuffer.empty())
-		processReadBuffer();
 }
-
 
 void	Connection::handleRequest() {
 	// Logger::info() << "fd=" << _fd.get() << " " << _request.getMethod() << " " << _request.getPath();
@@ -585,6 +410,9 @@ void	Connection::onCgiClientEvent() {
 	char	buf[IO_BUFFER_SIZE];
 	ssize_t	n = recv(_fd.get(), buf, sizeof(buf), 0);
 
+	/*	EDU: o buffer passa a acumular bytes lidos durante o CGI.
+		se o cliente mandar request adiantada, a gente nao perde
+		e processa no resetForNextRequest.*/
 	if (n > 0) {
 		_readBuffer.append(buf, static_cast<size_t>(n));
 		_lastActivity = std::time(NULL);
