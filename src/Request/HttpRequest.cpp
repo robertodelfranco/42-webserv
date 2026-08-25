@@ -6,7 +6,7 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/24 17:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2026/07/26 10:17:14 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/08/22 14:37:41 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -96,82 +96,4 @@ std::string HttpRequest::getHeader(const std::string &key) const
 const std::string &HttpRequest::getBody() const
 {
     return body_;
-}
-
-/////// fim ////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-/*------------------------------------------------------------------------------
-                                     ██                          ▄▄     
-████▄ ▄█▀█▄ ▄████ ██ ██ ▄█▀█▄ ▄█▀▀▀ ▀██▀▀   ███▄███▄ ▄███▄ ▄████ ██ ▄█▀ 
-██ ▀▀ ██▄█▀ ██ ██ ██ ██ ██▄█▀ ▀███▄  ██     ██ ██ ██ ██ ██ ██    ████   
-██    ▀█▄▄▄ ▀████ ▀██▀█ ▀█▄▄▄ ▄▄▄█▀  ██     ██ ██ ██ ▀███▀ ▀████ ██ ▀█▄ 
-               ██                                                       
-               ▀▀                                                       
-APAGAR TUDO ISSO QUANDO CONCLUIR O CONFIG!!!!!!!!!!!! ------------------------*/
-
-HttpRequest::HttpRequest(const std::string &mock)
-: method_(), path_(), query_(), httpVersion_(), headers_(), body_()
-{
-	if (mock == "MOCK1") {
-		method_				= "GET";
-		path_				= "/index.html";
-		httpVersion_		= "HTTP/1.1";
-		headers_["host"]	= "localhost:8080";
-	}
-	else if (mock == "MOCK2") {
-		method_			= "GET";
-		path_			= "/uploads/";
-		httpVersion_	= "HTTP/1.0";
-	}
-	else if (mock == "MOCK3") {
-		method_				= "GET";
-		path_				= "/uploads";
-		httpVersion_		= "HTTP/1.1";
-		headers_["host"]	= "localhost:8080";
-	}
-	else if (mock == "MOCK4") {
-		method_			= "POST";
-		path_			= "/uploads/novo.txt";
-		httpVersion_	= "HTTP/1.1";
-		body_			= "conteudo do arquivo enviado";
-		headers_["host"]			= "localhost:8080";
-		headers_["content-type"]	= "text/plain";
-		headers_["content-length"]	= "27";
-	}
-	else if (mock == "MOCK5") {               
-		method_			= "DELETE";
-		path_			= "/uploads/novo.txt";
-		httpVersion_	= "HTTP/1.0";
-	}
-	else
-		exit(1);
-}
-
-void	HttpRequest::setRequestLineProvisional(const std::string& method, const std::string& path,
-										   const std::string& query, const std::string& version)
-{
-	method_			= method;
-	path_			= path;
-	query_			= query;
-	httpVersion_	= version;
-}
-
-void	HttpRequest::setHeaderProvisional(const std::string& key, const std::string& value)
-{
-	headers_[key] = value;
-}
-
-void	HttpRequest::setBodyProvisional(const std::string& body)
-{
-	body_ = body;
 }

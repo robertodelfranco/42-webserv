@@ -37,10 +37,6 @@ class Connection {
 	private:
 		FileDescriptor		_fd;
 		std::string			_readBuffer;   // bytes recebidos até agora, ainda não processados
-		size_t				_headersEnd;   // npos enquanto o \r\n\r\n não chegou; depois, índice do 1º byte do body
-		long long			_bodyExpected; // Content-Length anunciado; -1 = ainda desconhecido
-		size_t				_requestEnd;   // fim da request tratada dentro do _readBuffer (o que vier depois já é a próxima)
-		bool				_chunked;      // body veio com Transfer-Encoding: chunked
 		bool				_keepAlive;    // reaproveitar a conexão depois de responder
 		std::string			_writeBuffer;  // resposta pendente de ser enviada
 		size_t				_writeOffset; // marca quantos bytes já foram enviados
@@ -70,19 +66,7 @@ class Connection {
 		Connection(const Connection& other);
 		Connection& operator=(const Connection& other);
 
-		// "os bytes que tenho no _readBuffer já formam uma request inteira?"
-		// só o Content-Length diz onde parar de ler.
-		enum RequestStatus {
-			REQ_INCOMPLETE,			// faltam bytes, volta pro poll()
-			REQ_COMPLETE,			// mensagem inteira no buffer
-			REQ_BAD,				// framing impossível de interpretar -> 400
-			REQ_TOO_LARGE,			// body acima do client_max_body_size -> 413
-			REQ_HEADERS_TOO_LARGE	// bloco de headers sem fim à vista -> 431
-		};
-
-		RequestStatus	checkRequestFraming();
 		void			decideKeepAlive();
-		void			processReadBuffer();
 		void			resetForNextRequest();	// limpa o estado da request anterior e volta pra READING
 
 		// Ponto de entrega pro resto do sistema (parser -> resposta).

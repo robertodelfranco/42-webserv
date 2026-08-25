@@ -6,32 +6,13 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/25 16:26:36 by luide-ca          #+#    #+#             */
-/*   Updated: 2026/07/26 10:09:33 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/08/22 19:25:30 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-/*
-
-    TODO:	finish recv implementation
-			O readFromFd() está fora das especificações do subject.
-
-	TODO:	IDENTIFICAR EM QUAL PARTE DO CÓDIGO ESTAMOS REJEITANDO PIPELINING.
-			pipelining = client envia vários requests no mesmo raw sem esperar
-			resposta do servidor. daí o servidor segura cada request. Não temos
-			que lidar com isso, se o fd mandar mais do que deve, podemos recusar
-			o request inteiro e devolver um erro de request mal formado. Porém
-			não podemos confundir pipelining com keep-alive. O keep-alive tem
-			a ver com o fd não ser fechado, mas o request em si tem que ser
-			completo. (edu)
-*/
 
 #include "HttpParser.hpp"
 #include <sstream>     
-#include <sys/types.h>
-#include <sys/socket.h> 
-#include <unistd.h>     
-#include <cstring>      
-#include <cctype>       
 #include <cstdlib>      
 
 
@@ -39,184 +20,178 @@
 // OCF
 // =======================
 
-HttpParser::HttpParser() {}
-HttpParser::HttpParser(const HttpParser &other) {
-	(void)other;
-}
+/* EDU (Aug22): inicializando as novas variaveis de estado no construtor. */
+HttpParser::HttpParser() 
+: _raw(), _headersEnd(std::string::npos), _bodyExpected(-1), 
+  _requestEnd(0), _chunked(false), _headersFilled(false) {}
+
+HttpParser::HttpParser(const HttpParser &other) { *this = other; }
+
 HttpParser &HttpParser::operator=(const HttpParser &other) { 
-	(void)other;
-	return *this; }
+    if (this != &other) {
+        _raw = other._raw;
+        _headersEnd = other._headersEnd;
+        _bodyExpected = other._bodyExpected;
+        _requestEnd = other._requestEnd;
+        _chunked = other._chunked;
+        _headersFilled = other._headersFilled;
+    }
+    return *this; 
+}
+
 HttpParser::~HttpParser() {}
 
 // =======================
 // Public API
 // =======================
 
-void HttpParser::readFromFd(int fd)
+/* EDU (AUG22): aqui esta a maquina de estados, o feed. ela vai lendo os bytes crus,
+acha o fim dos headers e verifica o tamanho do body ou chunks. */
+RequestStatus HttpParser::feed(const char* data, size_t n, long long maxBodySize)
 {
-	/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	
-	TODO esse readFromFd() está fora das especificações do subject. A leitura
-	deve ser não-bloqueante, o que não é o caso aqui - o while só para quando 
-	todo o raw_ tiver sido recebido. porém o subject deixa explícito que cada
-	chamada a recv() deve ser intermediada pelo eventloop e o poll(). não faz
-	sentido eu mexer muito aqui agora sem entender como o eventloop funciona.
+    _raw.append(data, n);
 
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+    if (!_headersFilled) {
+        _headersEnd = _raw.find("\r\n\r\n");
+        if (_headersEnd == std::string::npos) {
+            if (_raw.size() > MAX_HEADER_SIZE)
+                return REQ_HEADERS_TOO_LARGE;
+            return REQ_INCOMPLETE;
+        }
+        _headersEnd += 4; 
+        _headersFilled = true;
 
-	raw_.clear();
+        std::string headers = _raw.substr(0, _headersEnd);
+        std::string value;
 
-    char    buffer[4096];
-    ssize_t n;
+        if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked") {
+            _chunked = true;
+        } else if (findHeader(headers, "content-length", value)) {
+            char *end;
+            _bodyExpected = std::strtoll(value.c_str(), &end, 10);
+            if (end == value.c_str() || _bodyExpected < 0) return REQ_BAD;
+        } else {
+            _bodyExpected = 0; 
+        }
+    }
 
-	while (true)
-	{
-		n = recv(fd, buffer, sizeof(buffer), 0);
+    long long bodySoFar = static_cast<long long>(_raw.size() - _headersEnd);
 
-		 // 0 = cliente fechou a conexão; -1 = erro / "sem dados agora"
-		if (n <= 0) 
-			break;
+    if (_chunked) {
+        if (bodySoFar > maxBodySize) return REQ_TOO_LARGE;
+        
+        if (_raw.compare(_headersEnd, 5, "0\r\n\r\n") == 0) {
+            _requestEnd = _headersEnd + 5;
+            return REQ_COMPLETE;
+        }
+        std::string::size_type last = _raw.find("\r\n0\r\n\r\n", _headersEnd);
+        if (last != std::string::npos) {
+            _requestEnd = last + 7;
+            return REQ_COMPLETE;
+        }
+        return REQ_INCOMPLETE;
+    }
 
-		raw_.append(buffer, n);
+    if (_bodyExpected > maxBodySize) return REQ_TOO_LARGE;
+    if (bodySoFar >= _bodyExpected) {
+        _requestEnd = _headersEnd + static_cast<size_t>(_bodyExpected);
+        return REQ_COMPLETE;
+    }
 
-		// li menos que o tamanho do buffer cheio 
-		if (n < static_cast<ssize_t>(sizeof(buffer)))
-			break;
-	}
-
-    if (raw_.empty())
-        throw ParseException("Empty HTTP request (no data read from socket)");
-
-	/* checar timeout, um request que não tem fim é um tipo de ataque. (edu) */
-
+    return REQ_INCOMPLETE;
 }
 
+size_t HttpParser::requestEnd() const {
+    return _requestEnd;
+}
+
+/*	EDU (AUG22): O parse() agora só roda de verdade quando o feed() avisa
+	que a request ta completa (_headersFilled e _requestEnd > 0) */
 void HttpParser::parse(HttpRequest &req)
 {
-    std::string::size_type posRequestLineEnd = raw_.find("\r\n");
-    if (posRequestLineEnd == std::string::npos)
-        throw ParseException("Malformed HTTP request: missing CRLF after request line");
+    if (!_headersFilled || _requestEnd == 0)
+        return;
 
-    std::string::size_type posHeaderEnd = raw_.find("\r\n\r\n");
-    if (posHeaderEnd == std::string::npos)
-        throw ParseException("Malformed HTTP request: missing empty line after headers");
-
-    std::string requestLine = raw_.substr(0, posRequestLineEnd);
-    std::string headersBlock = raw_.substr(
-        posRequestLineEnd + 2,
-        posHeaderEnd - (posRequestLineEnd + 2)
+    std::string::size_type posRequestLineEnd = _raw.find("\r\n");
+    std::string requestLine = _raw.substr(0, posRequestLineEnd);
+    std::string headersBlock = _raw.substr(
+        posRequestLineEnd + 2, 
+        _headersEnd - (posRequestLineEnd + 2) - 4
     );
-    std::string body = raw_.substr(posHeaderEnd + 4);
+    
+    std::string body = _raw.substr(_headersEnd, _requestEnd - _headersEnd);
 
     parseRequestLine(req, requestLine);
     parseHeadersBlock(req, headersBlock);
-    parseBody(req, body);
+
+    if (_chunked) {
+        req.body_ = decodeChunked(body);
+    } else {
+        req.body_ = body;
+    }
 }
 
 // =======================
 // Internal helpers
 // =======================
 
-bool HttpParser::isValidPath(const std::string &path)
-{
-    if (path.empty())
-        return (false);
-    if (path[0] != '/')
-        return (false);
-    return (true);
+/* EDU (AUG22): logica do findHeader e decodeChunked trazida da Connection
+para o parser mastigar os chunks sozinho. */
+bool HttpParser::findHeader(const std::string& block, const std::string& name,
+							std::string& out) {
+    std::string::size_type lineStart = block.find("\r\n");
+    if (lineStart == std::string::npos) return false;
+    lineStart += 2;
+
+    while (lineStart < block.size()) {
+        std::string::size_type lineEnd = block.find("\r\n", lineStart);
+        if (lineEnd == std::string::npos) lineEnd = block.size();
+
+        std::string::size_type colon = block.find(':', lineStart);
+        if (colon != std::string::npos && colon < lineEnd && toLower(block.substr(lineStart, colon - lineStart)) == name) {
+            std::string value = block.substr(colon + 1, lineEnd - colon - 1);
+            std::string::size_type begin = value.find_first_not_of(" \t");
+            std::string::size_type end = value.find_last_not_of(" \t");
+            out = (begin == std::string::npos) ? "" : value.substr(begin, end - begin + 1);
+            return true;
+        }
+        lineStart = lineEnd + 2;
+    }
+    return false;
 }
 
-bool HttpParser::isValidChunkedBody(const std::string &body)
-{
+std::string HttpParser::decodeChunked(const std::string& body) {
+    std::string out;
     size_t pos = 0;
-    size_t len = body.length();
 
     while (true)
-    {
+	{
         size_t lineEnd = body.find("\r\n", pos);
         if (lineEnd == std::string::npos)
-            return (false);
+			break;
 
         std::string sizeHex = body.substr(pos, lineEnd - pos);
-
-        if (sizeHex.empty())
-            return (false);
-
         char *end;
         long chunkSize = std::strtol(sizeHex.c_str(), &end, 16);
 
-        if (end == sizeHex.c_str() || chunkSize < 0)
-            return (false);
+        if (end == sizeHex.c_str() || chunkSize <= 0)
+			break; 
 
         pos = lineEnd + 2;
 
-        if (chunkSize == 0)
-        {
-            size_t lastCRLF = body.find("\r\n", pos);
-            if (lastCRLF == std::string::npos)
-                return (false);
+        if (pos + static_cast<size_t>(chunkSize) > body.size())
+			break;
 
-            return (true);
-        }
-
-        if (pos + chunkSize > len)
-            return (false);
-
-        pos += chunkSize;
-
-        if (pos + 2 > len ||
-            body[pos] != '\r' ||
-            body[pos + 1] != '\n')
-            return (false);
-
-        pos += 2;
+        out.append(body, pos, static_cast<size_t>(chunkSize));
+        pos += static_cast<size_t>(chunkSize) + 2; 
     }
-
-    return (false);
+    return out;
 }
 
-bool HttpParser::isValidBody(const HttpRequest &req, const std::string &body)
+bool HttpParser::isValidPath(const std::string &path)
 {
-    std::map<std::string, std::string>::const_iterator itCL =
-        req.headers_.find("content-length");
-    std::map<std::string, std::string>::const_iterator itTE =
-        req.headers_.find("transfer-encoding");
-
-    if (itCL != req.headers_.end() && itTE != req.headers_.end())
-        return (false);
-
-    if (itCL != req.headers_.end())
-    {
-        char *end;
-        long contentLen = std::strtol(itCL->second.c_str(), &end, 10);
-
-        if (end == itCL->second.c_str() || contentLen < 0)
-            return (false);
-
-        if (static_cast<size_t>(contentLen) != body.length())
-            return (false);
-
-        return (true);
-    }
-
-    if (itTE != req.headers_.end())
-    {
-        if (itTE->second != "chunked")
-            return (false);
-
-        if (!isValidChunkedBody(body))
-            return (false);
-
-        return (true);
-    }
-
-    if (req.method_ == "GET")
-        return (true);
-
-    if (!body.empty())
-        return (false);
-        
-    return (true);
+    if (path.empty() || path[0] != '/') return false;
+    return true;
 }
 
 // =======================
@@ -227,14 +202,20 @@ void HttpParser::parseRequestLine(HttpRequest &req, const std::string &line)
 {
     std::istringstream iss(line);
     std::string method;
-    std::string path;
+    std::string target;
     std::string version;
 
-    if (!(iss >> method >> path >> version))
+    if (!(iss >> method >> target >> version))
         throw ParseException("Invalid HTTP request line: \"" + line + "\"");
 
     setMethod(req, method);
+    
+    size_t cutInterr = target.find("?");
+    std::string path = (cutInterr == std::string::npos) ? target : target.substr(0, cutInterr);
+    std::string query = (cutInterr == std::string::npos) ? "" : target.substr(cutInterr + 1);
+
     setPath(req, path);
+    req.query_ = query;
     setHTTPVersion(req, version);
 }
 
@@ -247,8 +228,8 @@ void HttpParser::parseHeadersBlock(HttpRequest &req, const std::string &block)
         if (!line.empty() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
 
-        if (line.empty())
-            continue;
+			if (line.empty())
+			continue;
 
         std::string::size_type pos = line.find(':');
         if (pos == std::string::npos) {
@@ -265,13 +246,6 @@ void HttpParser::parseHeadersBlock(HttpRequest &req, const std::string &block)
     }
 }
 
-void HttpParser::parseBody(HttpRequest &req, const std::string &body)
-{
-    if (!isValidBody(req, body))
-        throw BodyException();
-    req.body_ = body;
-}
-
 void HttpParser::setMethod(HttpRequest &req, const std::string &method)
 {
     if (method != "GET" && method != "POST" && method != "DELETE")
@@ -281,8 +255,8 @@ void HttpParser::setMethod(HttpRequest &req, const std::string &method)
 
 void HttpParser::setPath(HttpRequest &req, const std::string &path)
 {
-    if (!isValidPath(path))
-        throw PathException();
+    if (!isValidPath(path)) 
+		throw PathException();
     req.path_ = path;
 }
 
