@@ -8,7 +8,7 @@
 #include "../Network/FileDescriptor.hpp"
 
 // Sem isso um CGI maluco (while True: print) enche a RAM do servidor
-#define CGI_MAX_OUTPUT (10 * 1024 * 1024)
+#define CGI_MAX_OUTPUT (200 * 1024 * 1024)
 
 // o subject exige que nenhuma request pendure 10s ainda é bastante
 // pra qualquer script honesto e faz o 504 aparecer no terminal
