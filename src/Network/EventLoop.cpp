@@ -58,16 +58,20 @@ int	EventLoop::getPollTimeoutMs() const {
 		return -1;
 
 	std::time_t	now = std::time(NULL);
-	int	smallestRemaining = CONNECTION_TIMEOUT;
+
+	int	smallestRemaining = -1;
 
 	for (std::map<int, Connection*>::const_iterator it = _connections.begin(); it != _connections.end(); ++it) {
 		int remaining = it->second->remainingBudget(now);
 
 		if (remaining <= 0 )
 			return 0;
-		if (remaining < smallestRemaining)
+		if (smallestRemaining < 0 || remaining < smallestRemaining)
 			smallestRemaining = remaining;
 	}
+
+	if (smallestRemaining < 0)
+		return -1; // nenhuma conexão com prazo, dorme até chegar evento
 	return smallestRemaining * 1000;
 }
 

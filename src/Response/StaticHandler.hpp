@@ -21,6 +21,11 @@ class StaticHandler : public IRequestHandler {
 
 		bool isMethodAllowed(const std::string &method) const;
 
+		/* URI de diretório sem a barra final quebra os href relativos da
+		listagem; estes dois mandam o 301 pra versão com barra. */
+		bool	 needsDirSlash(bool autoindex) const;
+		Response redirectToDirSlash() const;
+
 	public:
 		StaticHandler(const HttpRequest &req, const Location &loc);
         Response build();

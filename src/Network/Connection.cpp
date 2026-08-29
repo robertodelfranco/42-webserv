@@ -107,9 +107,10 @@ void	Connection::parseAndDispatch() {
 		handleRequest();
 	}
 
+	// Método que o servidor não implementa (PUT, OPTIONS, FOOBAR) é 501
 	catch (const HttpParser::MethodException& e) {
 		Logger::warning() << "fd=" << _fd.get() << " " << e.what();
-		buildErrorResponse(405);
+		buildErrorResponse(501);
 	}
 
 	catch (const HttpParser::HTTPVersionException& e) {
@@ -221,8 +222,13 @@ void	Connection::onWritable() {
 	ssize_t	n = send(_fd.get(), _writeBuffer.data() + _writeOffset,
 						_writeBuffer.size() - _writeOffset, MSG_NOSIGNAL);
 
-	if (n <= 0) {
+	if (n < 0) {
 		Logger::debug() << "fd=" << _fd.get() << " send falhou, encerrando";
+		_state = CLOSED;
+		return;
+	}
+	if (n == 0) {
+		Logger::debug() << "fd=" << _fd.get() << " send nao escreveu nada, encerrando";
 		_state = CLOSED;
 		return;
 	}
@@ -449,8 +455,13 @@ void	Connection::onCgiClientEvent() {
 		return;
 	}
 
-	/* n == 0 é o cliente que fechou e então não vai ler nenhuma resposta */
-	Logger::debug() << "fd=" << _fd.get() << " cliente desistiu durante o CGI";
+	// -1 e 0 conferidos separadamente, como a régua pede. O desfecho é o
+	// mesmo (não há mais pra quem responder), só a razão muda.
+	if (n < 0)
+		Logger::debug() << "fd=" << _fd.get() << " recv falhou durante o CGI";
+	else
+		Logger::debug() << "fd=" << _fd.get() << " cliente desistiu durante o CGI";
+
 	dropCgi();
 	_state = CLOSED;
 }

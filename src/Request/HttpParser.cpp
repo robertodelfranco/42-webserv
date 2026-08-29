@@ -262,7 +262,10 @@ void HttpParser::parseHeadersBlock(HttpRequest &req, const std::string &block)
 
 void HttpParser::setMethod(HttpRequest &req, const std::string &method)
 {
-	if (method != "GET" && method != "POST" && method != "DELETE")
+	//HEAD entra aqui porque o servidor SABE fazer HEAD (StaticHandler tem
+	// handleHEAD). Quem decide se ele é permitido neste location é o Router
+	if (method != "GET" && method != "POST"
+		&& method != "DELETE" && method != "HEAD")
 		throw MethodException();
 	req.method_ = method;
 }

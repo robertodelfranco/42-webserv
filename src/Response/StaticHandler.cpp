@@ -17,6 +17,25 @@ bool StaticHandler::isMethodAllowed(const std::string &method) const {
 	return (location.getAllowMethods() & bit) != 0;
 }
 
+/* A listagem do autoindex gera href relativo ("arquivo.txt"). Sem a barra
+final na URI o browser resolve contra o pai ("/pasta" + "arquivo.txt" =
+"/arquivo.txt") e todo link quebra. O nginx resolve com 301 pra versão
+com barra, e é o que fazemos */
+Response StaticHandler::redirectToDirSlash() const {
+	Response resp;
+
+	resp.setStatus(MOVED_PERMANENTLY);
+	resp.setHeader("Location", request.getPath() + "/");
+	resp.setBody("");
+	return resp;
+}
+
+bool StaticHandler::needsDirSlash(bool autoindex) const {
+	const std::string&	path = request.getPath();
+
+	return autoindex && !path.empty() && path[path.size() - 1] != '/';
+}
+
 Response StaticHandler::handleGET(){
 	Response resp;
 	std::string file_path;
@@ -24,6 +43,9 @@ Response StaticHandler::handleGET(){
 
 	if (!ResponseHelpers::resolveTargetPath(request, location, file_path, autoindex))
 		return ErrorResponse(NOT_FOUND);
+
+	if (needsDirSlash(autoindex))
+		return redirectToDirSlash();
 
 	if (autoindex) {
 		std::string html = ResponseHelpers::buildAutoindexHtml(file_path, request.getPath());
@@ -60,6 +82,9 @@ Response StaticHandler::handleHEAD() {
 
 	if (!ResponseHelpers::resolveTargetPath(request, location, file_path, autoindex))
 		return ErrorResponse(NOT_FOUND);
+
+	if (needsDirSlash(autoindex))
+		return redirectToDirSlash();
 
 	if (autoindex) {
 		std::string html = ResponseHelpers::buildAutoindexHtml(file_path, request.getPath());
