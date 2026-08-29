@@ -37,85 +37,91 @@ enum RequestStatus {
 
 class HttpParser
 {
-    private:
-        std::string         _raw;
-        /*	EDU (AUG22): adicionei aqui as variaveis de estado que estavam no
+	private:
+		std::string         _raw;
+		/*	EDU (AUG22): adicionei aqui as variaveis de estado que estavam no
 			Connection (_headersEnd, _bodyExpected, etc), agora o parser controla
 			o próprio estado e avisa quando termina de receber o request. */
-        size_t              _headersEnd;   
-        long long           _bodyExpected; 
-        size_t              _requestEnd;   
-        bool                _chunked;      
-        bool                _headersFilled;
+		size_t              _headersEnd;   
+		long long           _bodyExpected; 
+		size_t              _requestEnd;   
+		bool                _chunked;      
+		bool                _headersFilled;
 
-        // ===== Internal helpers =====
-        bool isValidPath(const std::string &path);
-        bool isValidChunkedBody(const std::string &body);
-        bool isValidBody(const HttpRequest &req, const std::string &body);
-        
-        /*	EDU (AUG22): o findHeader e decodeChunked de Connection. */
-        bool findHeader(const std::string& block, const std::string& name,
+		// ===== Internal helpers =====
+		bool isValidPath(const std::string &path);
+		bool isValidChunkedBody(const std::string &body);
+		bool isValidBody(const HttpRequest &req, const std::string &body);
+		
+		/*	EDU (AUG22): o findHeader e decodeChunked de Connection. */
+		bool findHeader(const std::string& block, const std::string& name,
 						std::string& out);
-        std::string decodeChunked(const std::string& body);
+		std::string decodeChunked(const std::string& body);
 
-        // ===== Internal Parsers =====
-        void parseRequestLine(HttpRequest &req, const std::string &line);
-        void parseHeadersBlock(HttpRequest &req, const std::string &block);
-        void parseBody(HttpRequest &req, const std::string &body);
+		// ===== Internal Parsers =====
+		void parseRequestLine(HttpRequest &req, const std::string &line);
+		void parseHeadersBlock(HttpRequest &req, const std::string &block);
+		void parseBody(HttpRequest &req, const std::string &body);
 
-        void setMethod(HttpRequest &req, const std::string &method);
-        void setPath(HttpRequest &req, const std::string &path);
-        void setHTTPVersion(HttpRequest &req, const std::string &version);
+		void setMethod(HttpRequest &req, const std::string &method);
+		void setPath(HttpRequest &req, const std::string &path);
+		void setHTTPVersion(HttpRequest &req, const std::string &version);
 
-    public:
+	public:
 		// ===== Canonical form =====
-        HttpParser();
-        HttpParser(const HttpParser &other);
-        HttpParser &operator=(const HttpParser &other);
-        ~HttpParser();
+		HttpParser();
+		HttpParser(const HttpParser &other);
+		HttpParser &operator=(const HttpParser &other);
+		~HttpParser();
 
-        /*	EDU (AUG22): o metodo feed() e uma maquina de estados. ele consome
+		/*	EDU (AUG22): o metodo feed() e uma maquina de estados. ele consome
 			os bytes do poll() e retorna o status (terminou, deu erro, etc). */
-        RequestStatus 	feed(const char* data, size_t n, long long maxBodySize);
-        size_t			requestEnd() const;
-        void			parse(HttpRequest &req);
+		RequestStatus 	feed(const char* data, size_t n, long long maxBodySize);
+		size_t			requestEnd() const;
+		void			parse(HttpRequest &req);
 
-        // ===== Exceptions =====
-        class MethodException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
+		/*	Bytes que sobraram depois do fim desta request. O cliente pode
+		mandar a próxima colada na primeira (pipelining), e esses bytes
+		ficam presos no _raw. Sem isso a Connection não tem como resgatar
+		eles antes de trocar o parser. Vazio se não houve REQ_COMPLETE. */
+		std::string		leftover() const;
 
-        class PathException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
+		// ===== Exceptions =====
+		class MethodException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
 
-        class HTTPVersionException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
+		class PathException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
 
-        class HeaderException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
+		class HTTPVersionException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
 
-        class BodyException : public std::exception {
-        public:
-            virtual const char *what() const throw();
-        };
+		class HeaderException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
 
-        class ParseException : public std::exception {
-        public:
-            ParseException(const std::string &msg);
-            ParseException(const ParseException &other);
-            ParseException &operator=(const ParseException &other);
-            virtual ~ParseException() throw();
-            virtual const char *what() const throw();
-        private:
-            std::string _msg;
-        };
+		class BodyException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
+
+		class ParseException : public std::exception {
+		public:
+			ParseException(const std::string &msg);
+			ParseException(const ParseException &other);
+			ParseException &operator=(const ParseException &other);
+			virtual ~ParseException() throw();
+			virtual const char *what() const throw();
+		private:
+			std::string _msg;
+		};
 
 };
 

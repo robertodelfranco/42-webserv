@@ -154,6 +154,14 @@ void	Connection::resetForNextRequest() {
 	_request = HttpRequest();
 	_response = Response();
 	_matchedLoc = NULL;
+
+	// Pipelining: o cliente pode ter mandado a próxima request colada na
+	// anterior, e esses bytes ficaram guardados dentro do parser. Resgata
+	// eles ANTES de zerar o parser, senão morrem aqui.
+	std::string pending = _parser.leftover();
+	if (!pending.empty())
+		_readBuffer.insert(0, pending);
+
 	_parser = HttpParser();
 	_lastActivity = std::time(NULL); // nova janela de ociosidade
 	_state = READING;
