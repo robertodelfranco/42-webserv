@@ -1,5 +1,6 @@
 #include "Router.hpp"
 #include "../Handlers/CgiHandler.hpp"
+#include "../Handlers/RedirectHandler.hpp"
 #include "../Utils/Logger.hpp"
 #include "../Response/StaticHandler.hpp"
 #include "../Response/ResponseHelpers.hpp"
@@ -41,6 +42,11 @@ RouteType Router::classify(const Location& loc, const HttpRequest& req) {
 	const std::string&	cgi_type = loc.getCgiType();
 	const std::string&	path = req.getPath();
 
+	/* "return" vence tudo: o location aponta pra outro lugar, então nem
+	CGI nem arquivo em disco chegam a ser considerados */
+	if (!loc.getRedir().empty())
+		return REDIRECT;
+
 	if (!cgi_type.empty() && path.size() >= cgi_type.size()
 			&& path.compare(path.size() - cgi_type.size(), cgi_type.size(), cgi_type) == 0)
 		return CGI;
@@ -53,6 +59,8 @@ esse é o famoso design pattern chamado de factory method */
 IRequestHandler* Router::createHandler(const Location& loc, const HttpRequest& req)
 {
 	switch (classify(loc, req)) {
+		case REDIRECT:
+			return new RedirectHandler();
 		case CGI:
 			return new CgiHandler();
 		case STATIC:
