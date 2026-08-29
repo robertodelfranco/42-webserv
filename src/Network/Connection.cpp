@@ -118,6 +118,14 @@ void	Connection::parseAndDispatch() {
 		buildErrorResponse(505);
 	}
 
+	/*	Path traversal. Vale a pena logar como WARNING e não como debug:
+		"../.." na URI não acontece por acidente, é alguém sondando. */
+	catch (const HttpParser::PathTraversalException& e) {
+		Logger::warning() << "fd=" << _fd.get() << " path traversal barrado: "
+			<< e.what();
+		buildErrorResponse(403);
+	}
+
 	catch (const std::exception& e) {
 		Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
 		buildErrorResponse(400);
@@ -145,6 +153,12 @@ void	Connection::handleParserStatus(RequestStatus status) {
 		case REQ_BAD:
 			Logger::warning() << "fd=" << _fd.get() << " framing invalido";
 			buildErrorResponse(400);
+			break;
+		/*	Transfer-Encoding que não é chunked. 501 e não 400: a request está
+			bem formada, o servidor é que não implementa esse transfer coding. */
+		case REQ_UNSUPPORTED_TRANSFER:
+			Logger::warning() << "fd=" << _fd.get() << " transfer-encoding nao suportado";
+			buildErrorResponse(501);
 			break;
 	}
 }

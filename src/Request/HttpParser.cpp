@@ -12,8 +12,9 @@
 
 
 #include "HttpParser.hpp"
-#include <sstream>     
-#include <cstdlib>      
+#include <sstream>
+#include <cstdlib>
+#include <vector>   // pilha de segmentos do normalizePath
 
 
 // =======================
@@ -67,37 +68,50 @@ RequestStatus HttpParser::feed(const char* data, size_t n, long long maxBodySize
 		if (_headersEnd > MAX_HEADER_SIZE)
 			return REQ_HEADERS_TOO_LARGE;
 
-		_headersFilled = true;
+		const std::string	headers = _raw.substr(0, _headersEnd);
+		std::string			teValue;
+		std::string			clValue;
 
-		std::string headers = _raw.substr(0, _headersEnd);
-		std::string value;
+		const bool	hasTE = findHeader(headers, "transfer-encoding", teValue);
+		const bool	hasCL = findHeader(headers, "content-length", clValue);
 
-		if (findHeader(headers, "transfer-encoding", value) && toLower(value) == "chunked") {
+		if (hasTE && hasCL)
+			return REQ_BAD;
+
+		if (hasTE) {
+			// "gzip", "deflate", "chunked, gzip"... não sabemos desmontar
+			if (toLower(teValue) != "chunked")
+				return REQ_UNSUPPORTED_TRANSFER;
 			_chunked = true;
-		} else if (findHeader(headers, "content-length", value)) {
-			char *end;
-			_bodyExpected = std::strtoll(value.c_str(), &end, 10);
-			if (end == value.c_str() || _bodyExpected < 0) return REQ_BAD;
+		} else if (hasCL) {
+			char	*end;
+			_bodyExpected = std::strtoll(clValue.c_str(), &end, 10);
+			/*	*end != '\0' recusa "5abc": o strtoll para no 'a' e devolve 5
+				sem reclamar, e aí a gente framaria a request pelo lixo. */
+			if (end == clValue.c_str() || *end != '\0' || _bodyExpected < 0)
+				return REQ_BAD;
 		} else {
-			_bodyExpected = 0; 
+			_bodyExpected = 0;
 		}
+
+		_headersFilled = true;
 	}
 
 	long long bodySoFar = static_cast<long long>(_raw.size() - _headersEnd);
 
 	if (_chunked) {
 		if (bodySoFar > maxBodySize) return REQ_TOO_LARGE;
-		
-		if (_raw.compare(_headersEnd, 5, "0\r\n\r\n") == 0) {
-			_requestEnd = _headersEnd + 5;
-			return REQ_COMPLETE;
-		}
-		std::string::size_type last = _raw.find("\r\n0\r\n\r\n", _headersEnd);
-		if (last != std::string::npos) {
-			_requestEnd = last + 7;
-			return REQ_COMPLETE;
-		}
-		return REQ_INCOMPLETE;
+
+		size_t			end = 0;
+		const ChunkScan	scan = scanChunked(_headersEnd, end);
+
+		if (scan == CHUNK_BAD)
+			return REQ_BAD; // antes isso pendurava a conexão até o timeout
+		if (scan == CHUNK_NEED_MORE)
+			return REQ_INCOMPLETE;
+
+		_requestEnd = end;
+		return REQ_COMPLETE;
 	}
 
 	if (_bodyExpected > maxBodySize) return REQ_TOO_LARGE;
@@ -208,6 +222,157 @@ bool HttpParser::isValidPath(const std::string &path)
 	return true;
 }
 
+// valor de um dígito hexadecimal, -1 se não for um
+static int	hexValue(char c)
+{
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	return -1;
+}
+
+/*	Decodifica os %XX do path. false em escape quebrado ("%zz", ou "%4" no
+	fim da string) e em %00. O %00 é recusado porque byte nulo é injeção
+	de fim de string: um "/foto%00.php" passa por qualquer checagem de 
+	extensão como se fosse .php e depois o open() enxerga só "/foto" */
+bool HttpParser::percentDecode(const std::string &in, std::string &out) {
+	out.clear();
+	out.reserve(in.size());
+
+	for (std::string::size_type i = 0; i < in.size(); ++i) {
+		if (in[i] != '%') {
+			out += in[i];
+			continue;
+		}
+
+		if (i + 2 >= in.size())
+			return false; // "%" ou "%4" sem os dois dígitos
+
+		const int	hi = hexValue(in[i + 1]);
+		const int	lo = hexValue(in[i + 2]);
+		if (hi < 0 || lo < 0)
+			return false;
+
+		const char	decoded = static_cast<char>(hi * 16 + lo);
+		if (decoded == '\0')
+			return false;
+
+		out += decoded;
+		i += 2;
+	}
+	return true;
+}
+
+/*	Colapsa "." , ".." e barras repetidas ("/a//b" = "/a/b"), usando uma
+	pilha de segmentos. False quando um ".." tenta desempilhar de uma pilha
+	vazia: é o caminho subindo acima da raiz da URI, ou seja, o traversal.
+	
+	Com o path normalizado aqui, "root + URI" não tem mais como sair do
+	root, e nenhum handler precisa repetir essa conta.
+
+	A barra final é preservada de propósito: o autoindex e o redirect 301
+	de diretório dependem dela pra saber que a URI aponta pra uma pasta. */
+bool HttpParser::normalizePath(const std::string &in, std::string &out)
+{
+	std::vector<std::string>	stack;
+	std::string					segment;
+	const bool					trailingSlash = !in.empty() && in[in.size() - 1] == '/';
+
+	// o <= fecha o último segmento, que não termina em '/'
+	for (std::string::size_type i = 0; i <= in.size(); ++i) {
+		if (i < in.size() && in[i] != '/') {
+			segment += in[i];
+			continue;
+		}
+
+		if (segment == "..") {
+			if (stack.empty())
+				return false; // subiu acima da raiz
+			stack.erase(stack.end() - 1);
+		}
+		else if (!segment.empty() && segment != ".") {
+			stack.push_back(segment); // vazio vem de "//", "." não move nada
+		}
+		segment.clear();
+	}
+
+	out = "/";
+	for (size_t i = 0; i < stack.size(); ++i) {
+		out += stack[i];
+		if (i + 1 < stack.size())
+			out += '/';
+	}
+	if (trailingSlash && !stack.empty())
+		out += '/';
+
+	return true;
+}
+
+/*	Isso substitui o find("\r\n0\r\n\r\n") de antes, que tinha dois furos:
+	casava com esses bytes dentro do dado de um chunk (cortando a request no
+	meio) e nunca detectava framing quebrado, deixando a conexão pendurada
+	até o timeout de 90s. Antes era feito por parseBody e IsValidChunkedBody
+	mas foram retiradas do projeto. */
+HttpParser::ChunkScan	HttpParser::scanChunked(size_t from, size_t &end) const
+{
+	size_t	pos = from;
+
+	while (true) {
+		const size_t	lineEnd = _raw.find("\r\n", pos);
+		if (lineEnd == std::string::npos)
+			return CHUNK_NEED_MORE; // a linha de tamanho ainda está chegando
+
+		std::string	sizeLine = _raw.substr(pos, lineEnd - pos);
+
+		// extensão de chunk ("1a;nome=valor") é legal, o tamanho é o que vem antes do ';'
+		const std::string::size_type	semi = sizeLine.find(';');
+		if (semi != std::string::npos)
+			sizeLine = sizeLine.substr(0, semi);
+
+		if (sizeLine.empty())
+			return CHUNK_BAD;
+
+		/*	strtol sozinho aceitaria " +5" e pararia no primeiro caractere
+			ruim sem reclamar, então cada dígito é conferido à mão antes. */
+		for (size_t i = 0; i < sizeLine.size(); ++i)
+			if (hexValue(sizeLine[i]) < 0)
+				return CHUNK_BAD;
+
+		char		*endp;
+		const long	chunkSize = std::strtol(sizeLine.c_str(), &endp, 16);
+		if (chunkSize < 0)
+			return CHUNK_BAD;
+
+		pos = lineEnd + 2;
+
+		if (chunkSize == 0) {
+			/*	Último chunk. Depois dele podem vir trailers, terminados por
+				uma linha vazia, que é o caso comum ("0\r\n\r\n"). */
+			while (true) {
+				const size_t	trailerEnd = _raw.find("\r\n", pos);
+				if (trailerEnd == std::string::npos)
+					return CHUNK_NEED_MORE;
+				if (trailerEnd == pos) { // linha vazia: acabou
+					end = pos + 2;
+					return CHUNK_OK;
+				}
+				pos = trailerEnd + 2; // era um trailer, pula
+			}
+		}
+
+		// o dado precisa caber inteiro, mais o CRLF que o fecha
+		if (pos + static_cast<size_t>(chunkSize) + 2 > _raw.size())
+			return CHUNK_NEED_MORE;
+		if (_raw[pos + chunkSize] != '\r' || _raw[pos + chunkSize + 1] != '\n')
+			return CHUNK_BAD;
+
+		pos += static_cast<size_t>(chunkSize) + 2;
+	}
+}
+
 // =======================
 // Internal Parsers
 // =======================
@@ -272,9 +437,20 @@ void HttpParser::setMethod(HttpRequest &req, const std::string &method)
 
 void HttpParser::setPath(HttpRequest &req, const std::string &path)
 {
-	if (!isValidPath(path)) 
+	/*	No path CRU, antes do decode: assim um "%2Fetc/passwd" (barra inicial
+		codificada) morre aqui em vez de virar "/etc/passwd" depois. */
+	if (!isValidPath(path))
 		throw PathException();
-	req.path_ = path;
+
+	std::string	decoded;
+	if (!percentDecode(path, decoded))
+		throw PathException(); // escape quebrado ou %00 -> 400
+
+	std::string	normalized;
+	if (!normalizePath(decoded, normalized))
+		throw PathTraversalException(); // escapou do root -> 403
+
+	req.path_ = normalized;
 }
 
 void HttpParser::setHTTPVersion(HttpRequest &req, const std::string &version)
@@ -308,6 +484,11 @@ const char *HttpParser::MethodException::what() const throw()
 const char *HttpParser::PathException::what() const throw()
 {
 	return "HttpRequest: invalid request path";
+}
+
+const char *HttpParser::PathTraversalException::what() const throw()
+{
+	return "HttpRequest: path escapes the document root";
 }
 
 const char *HttpParser::HTTPVersionException::what() const throw()

@@ -32,7 +32,8 @@ enum RequestStatus {
 	REQ_COMPLETE,			// mensagem inteira no buffer
 	REQ_BAD,				// framing impossível de interpretar -> 400
 	REQ_TOO_LARGE,			// body acima do client_max_body_size -> 413
-	REQ_HEADERS_TOO_LARGE	// bloco de headers sem fim à vista -> 431
+	REQ_HEADERS_TOO_LARGE,	// bloco de headers sem fim à vista -> 431
+	REQ_UNSUPPORTED_TRANSFER // Transfer-Encoding que não sabemos desmontar -> 501
 };
 
 class HttpParser
@@ -50,9 +51,30 @@ class HttpParser
 
 		// ===== Internal helpers =====
 		bool isValidPath(const std::string &path);
-		bool isValidChunkedBody(const std::string &body);
-		bool isValidBody(const HttpRequest &req, const std::string &body);
-		
+
+		/*	Nessa ordem: decodifica %XX e só depois normaliza.
+			Invertido, um "%2e%2e" passa batido pela normalização
+			e volta a virar ".." na hora de tocar o disco. */
+		bool percentDecode(const std::string &in, std::string &out);
+		bool normalizePath(const std::string &in, std::string &out);
+
+		/*	Resultado do passeio pelos chunks. Não dá pra usar RequestStatus
+			aqui: "faltam bytes" e "framing quebrado" são as únicas respostas
+			que o scanner sabe dar, quem traduz pra HTTP é o feed(). */
+		enum ChunkScan {
+			CHUNK_OK,			// achou o terminador, o fim da request é conhecido
+			CHUNK_NEED_MORE,	// válido até aqui, mas ainda incompleto
+			CHUNK_BAD			// tamanho ilegível, CRLF faltando, etc.
+		};
+
+		/*	Caminha chunk a chunk a partir de 'from'. Substitui o
+			find("\r\n0\r\n\r\n") do feed(), que casava com esses bytes quando
+			eles apareciam DENTRO do dado de um chunk e cortava a request no
+			lugar errado. Caminhando, o tamanho declarado manda, e dado nenhum
+			é confundido com terminador. */
+		ChunkScan scanChunked(size_t from, size_t &end) const;
+
+
 		/*	EDU (AUG22): o findHeader e decodeChunked de Connection. */
 		bool findHeader(const std::string& block, const std::string& name,
 						std::string& out);
@@ -61,7 +83,6 @@ class HttpParser
 		// ===== Internal Parsers =====
 		void parseRequestLine(HttpRequest &req, const std::string &line);
 		void parseHeadersBlock(HttpRequest &req, const std::string &block);
-		void parseBody(HttpRequest &req, const std::string &body);
 
 		void setMethod(HttpRequest &req, const std::string &method);
 		void setPath(HttpRequest &req, const std::string &path);
@@ -93,6 +114,13 @@ class HttpParser
 		};
 
 		class PathException : public std::exception {
+		public:
+			virtual const char *what() const throw();
+		};
+
+		/*	Separada da PathException porque o contrato de erro é outro:
+			path malformado é 400, path que escapa do root é 403. */
+		class PathTraversalException : public std::exception {
 		public:
 			virtual const char *what() const throw();
 		};

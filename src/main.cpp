@@ -16,7 +16,7 @@ int main(int ac, char **av)
 {
 	signal(SIGPIPE, SIG_IGN);
 
-	Logger::setLevel(Logger::DEBUG); // muda pra info aqui e todos os prints de debug somem automaticamente
+	Logger::setLevel(Logger::INFO); // muda pra info aqui e todos os prints de debug somem automaticamente
 	
 	if (ac > 2) {
 		std::cout << "Usage: ./webserv [Configuration File]" << std::endl;
