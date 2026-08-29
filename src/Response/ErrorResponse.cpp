@@ -35,6 +35,25 @@ std::string	ErrorResponse::generatePage(int code) const {
 	return ss.str();
 }
 
+/*	Os erros semânticos (403, 404, 405, 502, 504) vêm de uma request inteira
+	e bem formada, o keep-alive continua valendo e quem decide é a Connection
+	pelo header Connection. Antes TODO erro fechava, então um simples 404
+	derrubava a conexão, o que o nginx não faz e o pipelining não perdoa. */
+static bool	isConnectionFatal(int code) {
+	switch (code) {
+		case 400: // framing quebrado, não dá pra confiar no resto do buffer
+		case 408: // ociosidade estourou, a conexão já era
+		case 413: // corpo passou do limite, sobra body não lido no socket
+		case 431: // bloco de headers sem fim à vista
+		case 500: // estado interno indefinido, mais seguro cortar
+		case 501: // método não implementado: parse abortou antes do keep-alive
+		case 505: // versão não suportada: idem
+			return true;
+		default:
+			return false;
+	}
+}
+
 ErrorResponse::ErrorResponse(int code, const ServerConfig* server, const Location* loc) {
 	const std::string	page = configuredPage(code, server, loc);
 	std::string			body;
@@ -48,5 +67,6 @@ ErrorResponse::ErrorResponse(int code, const ServerConfig* server, const Locatio
 
 	setHeader("Content-Type", "text/html");
 	setBody(body);
-	setCloseAfterSend(true);
+	if (isConnectionFatal(code))
+		setCloseAfterSend(true);
 }

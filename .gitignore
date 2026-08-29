@@ -4,4 +4,5 @@ objs/
 .vscode/
 *.pdf
 *.md
+!README.md
 .*/
