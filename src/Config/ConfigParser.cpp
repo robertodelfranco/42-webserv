@@ -236,7 +236,9 @@ void	ConfigParser::getRedirect(ServerConfig& server, Location* location_pointer,
 		throw ConfigParseError("Redirect code out of range in return directive", it->line, it->col, it->value);
 
 	++it;
-	if (it->type != STRING)
+	/* PATH também vale: o lexer manda tudo que começa com '/' ou '.' pra lá,
+	e "return 301 /nova-pagina;" (redirect local) é o caso mais comum */
+	if (it->type != STRING && it->type != PATH)
 		throw ConfigParseError("Invalid redirect URL argument", it->line, it->col, it->value);
 
 	std::string	redirect_url = UtilsConfig::trim(it->value);

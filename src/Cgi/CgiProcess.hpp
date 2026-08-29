@@ -8,10 +8,11 @@
 #include "../Network/FileDescriptor.hpp"
 
 // Sem isso um CGI maluco (while True: print) enche a RAM do servidor
-#define CGI_MAX_OUTPUT (300 * 1024 * 1024) // reveja isso depois
+#define CGI_MAX_OUTPUT (200 * 1024 * 1024)
 
-// timeout próprio do cgi
-#define CGI_TIMEOUT 600
+// o subject exige que nenhuma request pendure 10s ainda é bastante
+// pra qualquer script honesto e faz o 504 aparecer no terminal
+#define CGI_TIMEOUT 20
 
 class CgiProcess {
 	public:

@@ -29,6 +29,7 @@ SRCS	=	main.cpp \
 			Request/HttpRequest.cpp \
 			Request/HttpParser.cpp \
 			Handlers/CgiHandler.cpp \
+			Handlers/RedirectHandler.cpp \
 			Cgi/CgiProcess.cpp \
 			Cgi/CgiOutputParser.cpp \
 

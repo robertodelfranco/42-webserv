@@ -8,8 +8,6 @@
 #include <sstream>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <limits.h>
-#include <cstdlib>
 
 static std::string	toMetaName(const std::string& header) {
 	std::string	out = "HTTP_";
@@ -41,6 +39,16 @@ static std::string	dirNameOf(const std::string& path) {
 	if (slash == 0)
 		return "/";
 	return path.substr(0, slash);
+}
+
+// Nome do script sem diretório ("/a/b/x.py" = "x.py"), é o que substitui
+// o realpath(), que não está na lista de funções permitidas do subject
+static std::string	baseNameOf(const std::string& path) {
+	std::string::size_type	slash = path.find_last_of('/');
+
+	if (slash == std::string::npos)
+		return path;
+	return path.substr(slash + 1);
 }
 
 std::vector<std::string>	CgiHandler::buildEnv(const HttpRequest& req,
@@ -125,13 +133,13 @@ bool	CgiHandler::handle(const HttpRequest& req, const Location& loc, Connection&
 		return true;
 	}
 
-	char		buf[PATH_MAX];
-	std::string	absPath = scriptPath;
-	if (realpath(scriptPath.c_str(), buf))
-		absPath = buf;
+	// O filho entra na pasta do script (chdir) e de lá o basename já basta
+	// pro execve e pro SCRIPT_FILENAME/PATH_TRANSLATED
+	const std::string	workDir = dirNameOf(scriptPath);
+	const std::string	scriptName = baseNameOf(scriptPath);
 
-	CgiProcess*	cgi = new CgiProcess(interpreter, absPath, dirNameOf(absPath),
-									 buildEnv(req, conn, absPath), req.getBody());
+	CgiProcess*	cgi = new CgiProcess(interpreter, scriptName, workDir,
+									 buildEnv(req, conn, scriptName), req.getBody());
 
 	if (!cgi->start()) {
 		delete cgi;

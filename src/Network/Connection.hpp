@@ -14,7 +14,7 @@ class CgiProcess;
 // Uma conexão em CGI_RUNNING é ISENTA disso pq ela não 
 // está ociosa, está esperando o filho (que tem o
 // prazo próprio dele, CGI_TIMEOUT)
-#define CONNECTION_TIMEOUT 90
+#define CONNECTION_TIMEOUT 60
 
 /* ESSE ENUM VAMOS USAR PARA REPRESENTAR O ESTADO DA CONEXÃO. */
 enum State {
@@ -68,6 +68,15 @@ class Connection {
 
 		void			decideKeepAlive();
 		void			resetForNextRequest();	// limpa o estado da request anterior e volta pra READING
+
+		/* o que fazer com cada RequestStatus devolvido pelo feed(): os dois
+		pontos que alimentam o parser (onReadable e o resto de pipelining do
+		resetForNextRequest) passam por aqui em vez de repetir o switch. */
+		void			handleParserStatus(RequestStatus status);
+
+		/* parse() + entrega pro handler. Cada exceção do HttpParser vira
+		aqui o status code que ela merece. */
+		void			parseAndDispatch();
 
 		// Ponto de entrega pro resto do sistema (parser -> resposta).
 		// PROVISÓRIO hoje só prepara uma resposta fixa. Connection não

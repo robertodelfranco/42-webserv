@@ -97,12 +97,86 @@ void	Connection::decideKeepAlive() {
 		_keepAlive = true;
 }
 
+/* Uma request inteira chegou: parseia e entrega pro handler.
+Cada exceção do HttpParser vira aqui o status code traduzido,
+em vez de todas caírem no mesmo 405 de antes. */
+void	Connection::parseAndDispatch() {
+	try {
+		_parser.parse(_request);
+		decideKeepAlive();
+		handleRequest();
+	}
+
+	// Método que o servidor não implementa (PUT, OPTIONS, FOOBAR) é 501
+	catch (const HttpParser::MethodException& e) {
+		Logger::warning() << "fd=" << _fd.get() << " " << e.what();
+		buildErrorResponse(501);
+	}
+
+	catch (const HttpParser::HTTPVersionException& e) {
+		Logger::warning() << "fd=" << _fd.get() << " " << e.what();
+		buildErrorResponse(505);
+	}
+
+	/*	Path traversal. Vale a pena logar como WARNING e não como debug:
+		"../.." na URI não acontece por acidente, é alguém sondando. */
+	catch (const HttpParser::PathTraversalException& e) {
+		Logger::warning() << "fd=" << _fd.get() << " path traversal barrado: "
+			<< e.what();
+		buildErrorResponse(403);
+	}
+
+	catch (const std::exception& e) {
+		Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
+		buildErrorResponse(400);
+	}
+}
+
+/*	Único lugar que decide o que fazer com o retorno do feed() */
+void	Connection::handleParserStatus(RequestStatus status) {
+	switch (status) {
+		case REQ_INCOMPLETE:
+			break; // volta pro poll() e espera o resto chegar
+		case REQ_COMPLETE:
+			parseAndDispatch();
+			break;
+		case REQ_TOO_LARGE:
+			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
+				<< _candidate->getBodySize() << " bytes";
+			buildErrorResponse(413);
+			break;
+		case REQ_HEADERS_TOO_LARGE:
+			Logger::warning() << "fd=" << _fd.get() << " bloco de headers acima de "
+				<< MAX_HEADER_SIZE << " bytes";
+			buildErrorResponse(431);
+			break;
+		case REQ_BAD:
+			Logger::warning() << "fd=" << _fd.get() << " framing invalido";
+			buildErrorResponse(400);
+			break;
+		/*	Transfer-Encoding que não é chunked. 501 e não 400: a request está
+			bem formada, o servidor é que não implementa esse transfer coding. */
+		case REQ_UNSUPPORTED_TRANSFER:
+			Logger::warning() << "fd=" << _fd.get() << " transfer-encoding nao suportado";
+			buildErrorResponse(501);
+			break;
+	}
+}
+
 void	Connection::resetForNextRequest() {
 	_writeBuffer.clear();
 	_writeOffset = 0;
 	_request = HttpRequest();
 	_response = Response();
 	_matchedLoc = NULL;
+
+	// Pipelining: o cliente pode ter mandado a próxima request colada na
+	// anterior, e esses bytes ficaram guardados dentro do parser. Resgata
+	// eles ANTES de zerar o parser, senão morrem aqui.
+	std::string pending = _parser.leftover();
+	if (!pending.empty())
+		_readBuffer.insert(0, pending);
+
 	_parser = HttpParser();
 	_lastActivity = std::time(NULL); // nova janela de ociosidade
 	_state = READING;
@@ -124,22 +198,9 @@ void	Connection::resetForNextRequest() {
 	if (!_readBuffer.empty()) {
 		std::string leftover = _readBuffer;
 		_readBuffer.clear();
-		
-		RequestStatus status = _parser.feed(leftover.c_str(), leftover.size(), _candidate->getBodySize());
-		if (status == REQ_COMPLETE) {
-			try {
-				_parser.parse(_request);
-				decideKeepAlive();
-				handleRequest();
-			} catch (const std::exception& e) {
-				Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
-				buildErrorResponse(400);
-			}
-		} else if (status != REQ_INCOMPLETE) {
-			if (status == REQ_TOO_LARGE) buildErrorResponse(413);
-			else if (status == REQ_HEADERS_TOO_LARGE) buildErrorResponse(431);
-			else buildErrorResponse(400);
-		}
+
+		handleParserStatus(_parser.feed(leftover.c_str(), leftover.size(),
+										_candidate->getBodySize()));
 	}
 }
 
@@ -167,33 +228,7 @@ void	Connection::onReadable() {
 	/*	Foi embora o checkRequestFraming(), agora usamos o feed() do HttpParser
 		pra saber se a request está completa. A conexao so repassa os bytes
 		crus e deixa a maquina de estados decidir o RequestStatus. */
-	RequestStatus status = _parser.feed(buf, n, _candidate->getBodySize());
-
-	switch (status) {
-		case REQ_INCOMPLETE:
-			break; // volta pro poll() e espera o resto chegar
-		case REQ_COMPLETE:
-			try {
-				_parser.parse(_request);
-				decideKeepAlive();
-				handleRequest();
-			} catch (const std::exception& e) {
-				Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
-				buildErrorResponse(400); 
-			}
-			break;
-		case REQ_TOO_LARGE:
-			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
-				<< _candidate->getBodySize() << " bytes";
-			buildErrorResponse(413);
-			break;
-		case REQ_HEADERS_TOO_LARGE:
-			buildErrorResponse(431);
-			break;
-		case REQ_BAD:
-			buildErrorResponse(400);
-			break;
-	}
+	handleParserStatus(_parser.feed(buf, n, _candidate->getBodySize()));
 }
 
 // Mesma regra do recv que só pode ler/enviar vigiado pelo poll()
@@ -201,8 +236,13 @@ void	Connection::onWritable() {
 	ssize_t	n = send(_fd.get(), _writeBuffer.data() + _writeOffset,
 						_writeBuffer.size() - _writeOffset, MSG_NOSIGNAL);
 
-	if (n <= 0) {
+	if (n < 0) {
 		Logger::debug() << "fd=" << _fd.get() << " send falhou, encerrando";
+		_state = CLOSED;
+		return;
+	}
+	if (n == 0) {
+		Logger::debug() << "fd=" << _fd.get() << " send nao escreveu nada, encerrando";
 		_state = CLOSED;
 		return;
 	}
@@ -429,8 +469,13 @@ void	Connection::onCgiClientEvent() {
 		return;
 	}
 
-	/* n == 0 é o cliente que fechou e então não vai ler nenhuma resposta */
-	Logger::debug() << "fd=" << _fd.get() << " cliente desistiu durante o CGI";
+	// -1 e 0 conferidos separadamente, como a régua pede. O desfecho é o
+	// mesmo (não há mais pra quem responder), só a razão muda.
+	if (n < 0)
+		Logger::debug() << "fd=" << _fd.get() << " recv falhou durante o CGI";
+	else
+		Logger::debug() << "fd=" << _fd.get() << " cliente desistiu durante o CGI";
+
 	dropCgi();
 	_state = CLOSED;
 }

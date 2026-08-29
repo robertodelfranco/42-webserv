@@ -12,6 +12,7 @@ enum RouteType
 {
 	STATIC,
 	CGI,
+	REDIRECT,
 	DIR,
 	ERROR
 };

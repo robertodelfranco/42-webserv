@@ -38,6 +38,9 @@ std::string HttpResponse::statusMessageCode(int code) const
 		case NO_CONTENT: return "No Content";
 		case MOVED_PERMANENTLY: return "Moved Permanently";
 		case FOUND: return "Found";
+		case SEE_OTHER: return "See Other";
+		case TEMPORARY_REDIRECT: return "Temporary Redirect";
+		case PERMANENT_REDIRECT: return "Permanent Redirect";
 		case BAD_REQUEST: return "Bad Request";
 		case FORBIDDEN: return "Forbidden";
 		case NOT_FOUND: return "Not Found";
@@ -49,6 +52,7 @@ std::string HttpResponse::statusMessageCode(int code) const
 		case NOT_IMPLEMENTED: return "Not Implemented";
 		case BAD_GATEWAY: return "Bad Gateway";
 		case GATEWAY_TIMEOUT: return "Gateway Timeout";
+		case HTTP_VERSION_NOT_SUPPORTED: return "HTTP Version Not Supported";
 		default: return "Unknown";
 	}
 }
