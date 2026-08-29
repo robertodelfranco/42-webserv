@@ -69,6 +69,15 @@ class Connection {
 		void			decideKeepAlive();
 		void			resetForNextRequest();	// limpa o estado da request anterior e volta pra READING
 
+		/* o que fazer com cada RequestStatus devolvido pelo feed(): os dois
+		pontos que alimentam o parser (onReadable e o resto de pipelining do
+		resetForNextRequest) passam por aqui em vez de repetir o switch. */
+		void			handleParserStatus(RequestStatus status);
+
+		/* parse() + entrega pro handler. Cada exceção do HttpParser vira
+		aqui o status code que ela merece. */
+		void			parseAndDispatch();
+
 		// Ponto de entrega pro resto do sistema (parser -> resposta).
 		// PROVISÓRIO hoje só prepara uma resposta fixa. Connection não
 		// interpreta os bytes. Quando o parser existir, é só esta linha

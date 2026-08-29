@@ -52,6 +52,7 @@ std::string HttpResponse::statusMessageCode(int code) const
 		case NOT_IMPLEMENTED: return "Not Implemented";
 		case BAD_GATEWAY: return "Bad Gateway";
 		case GATEWAY_TIMEOUT: return "Gateway Timeout";
+		case HTTP_VERSION_NOT_SUPPORTED: return "HTTP Version Not Supported";
 		default: return "Unknown";
 	}
 }

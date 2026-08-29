@@ -97,6 +97,57 @@ void	Connection::decideKeepAlive() {
 		_keepAlive = true;
 }
 
+/* Uma request inteira chegou: parseia e entrega pro handler.
+Cada exceção do HttpParser vira aqui o status code traduzido,
+em vez de todas caírem no mesmo 405 de antes. */
+void	Connection::parseAndDispatch() {
+	try {
+		_parser.parse(_request);
+		decideKeepAlive();
+		handleRequest();
+	}
+
+	catch (const HttpParser::MethodException& e) {
+		Logger::warning() << "fd=" << _fd.get() << " " << e.what();
+		buildErrorResponse(405);
+	}
+
+	catch (const HttpParser::HTTPVersionException& e) {
+		Logger::warning() << "fd=" << _fd.get() << " " << e.what();
+		buildErrorResponse(505);
+	}
+
+	catch (const std::exception& e) {
+		Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
+		buildErrorResponse(400);
+	}
+}
+
+/*	Único lugar que decide o que fazer com o retorno do feed() */
+void	Connection::handleParserStatus(RequestStatus status) {
+	switch (status) {
+		case REQ_INCOMPLETE:
+			break; // volta pro poll() e espera o resto chegar
+		case REQ_COMPLETE:
+			parseAndDispatch();
+			break;
+		case REQ_TOO_LARGE:
+			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
+				<< _candidate->getBodySize() << " bytes";
+			buildErrorResponse(413);
+			break;
+		case REQ_HEADERS_TOO_LARGE:
+			Logger::warning() << "fd=" << _fd.get() << " bloco de headers acima de "
+				<< MAX_HEADER_SIZE << " bytes";
+			buildErrorResponse(431);
+			break;
+		case REQ_BAD:
+			Logger::warning() << "fd=" << _fd.get() << " framing invalido";
+			buildErrorResponse(400);
+			break;
+	}
+}
+
 void	Connection::resetForNextRequest() {
 	_writeBuffer.clear();
 	_writeOffset = 0;
@@ -124,22 +175,9 @@ void	Connection::resetForNextRequest() {
 	if (!_readBuffer.empty()) {
 		std::string leftover = _readBuffer;
 		_readBuffer.clear();
-		
-		RequestStatus status = _parser.feed(leftover.c_str(), leftover.size(), _candidate->getBodySize());
-		if (status == REQ_COMPLETE) {
-			try {
-				_parser.parse(_request);
-				decideKeepAlive();
-				handleRequest();
-			} catch (const std::exception& e) {
-				Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
-				buildErrorResponse(400);
-			}
-		} else if (status != REQ_INCOMPLETE) {
-			if (status == REQ_TOO_LARGE) buildErrorResponse(413);
-			else if (status == REQ_HEADERS_TOO_LARGE) buildErrorResponse(431);
-			else buildErrorResponse(400);
-		}
+
+		handleParserStatus(_parser.feed(leftover.c_str(), leftover.size(),
+										_candidate->getBodySize()));
 	}
 }
 
@@ -167,33 +205,7 @@ void	Connection::onReadable() {
 	/*	Foi embora o checkRequestFraming(), agora usamos o feed() do HttpParser
 		pra saber se a request está completa. A conexao so repassa os bytes
 		crus e deixa a maquina de estados decidir o RequestStatus. */
-	RequestStatus status = _parser.feed(buf, n, _candidate->getBodySize());
-
-	switch (status) {
-		case REQ_INCOMPLETE:
-			break; // volta pro poll() e espera o resto chegar
-		case REQ_COMPLETE:
-			try {
-				_parser.parse(_request);
-				decideKeepAlive();
-				handleRequest();
-			} catch (const std::exception& e) {
-				Logger::warning() << "fd=" << _fd.get() << " parser error: " << e.what();
-				buildErrorResponse(400); 
-			}
-			break;
-		case REQ_TOO_LARGE:
-			Logger::warning() << "fd=" << _fd.get() << " body acima do limite de "
-				<< _candidate->getBodySize() << " bytes";
-			buildErrorResponse(413);
-			break;
-		case REQ_HEADERS_TOO_LARGE:
-			buildErrorResponse(431);
-			break;
-		case REQ_BAD:
-			buildErrorResponse(400);
-			break;
-	}
+	handleParserStatus(_parser.feed(buf, n, _candidate->getBodySize()));
 }
 
 // Mesma regra do recv que só pode ler/enviar vigiado pelo poll()
