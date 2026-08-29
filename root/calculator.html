@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora — webserv</title>
+<style>
+  :root{
+    --bg: #08060c;
+    --bg-glow: #1a0f2e;
+    --purple: #9b5de5;
+    --purple-dim: #4a2a73;
+    --text: #ece9f2;
+    --muted: #6f6a80;
+    --line: #1c1822;
+    --ok: #3fb950;
+    --err: #f85149;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html, body{ height:100%; }
+
+  body{
+    background:
+      radial-gradient(circle at 50% 20%, var(--bg-glow) 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  body::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(155,93,229,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(155,93,229,0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at 50% 15%, black 0%, transparent 70%);
+    pointer-events:none;
+  }
+
+  header{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:.7rem;
+    padding: 1.2rem 2rem;
+    border-bottom: 1px solid rgba(155,93,229,0.15);
+  }
+
+  .logo{ font-size:1rem; font-weight:700; color: var(--text); }
+  .logo span{ color: var(--purple); }
+
+  .badge{
+    font-size:.68rem;
+    letter-spacing:.05em;
+    color: var(--purple);
+    background: rgba(155,93,229,0.1);
+    border: 1px solid var(--purple-dim);
+    padding: .18rem .55rem;
+    border-radius: 999px;
+  }
+
+  header a{
+    margin-left:auto;
+    color: var(--muted);
+    font-size:.8rem;
+    text-decoration:none;
+  }
+  header a:hover{ color: var(--purple); }
+
+  main{
+    position:relative;
+    flex:1;
+    max-width: 420px;
+    width:100%;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+  }
+
+  h1{
+    font-size: 1.5rem;
+    font-weight:700;
+    margin-bottom:.4rem;
+    letter-spacing:-.01em;
+  }
+  h1 em{
+    font-style:normal;
+    background: linear-gradient(135deg, #fff 0%, var(--purple) 120%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+
+  .subtitle{
+    color: var(--muted);
+    font-size:.85rem;
+    margin-bottom: 2.2rem;
+  }
+
+  .row{
+    display:flex;
+    gap:.7rem;
+    margin-bottom: 1rem;
+  }
+
+  input[type="number"], select{
+    padding: .7rem 1rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--line);
+    border-radius:6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size:.88rem;
+    outline:none;
+    transition: border-color .2s ease;
+  }
+  input[type="number"]{ flex:1; min-width:0; }
+  input[type="number"]:focus, select:focus{ border-color: var(--purple); }
+
+  select{ flex-shrink:0; cursor:pointer; }
+
+  .btn{
+    width:100%;
+    padding: .78rem;
+    background: var(--purple);
+    color: #0c0714;
+    border:none;
+    border-radius:6px;
+    font-family: inherit;
+    font-size:.88rem;
+    font-weight:700;
+    letter-spacing:.02em;
+    cursor:pointer;
+    transition: filter .15s ease;
+  }
+  .btn:hover{ filter:brightness(1.1); }
+  .btn:disabled{
+    background: var(--line);
+    color: var(--muted);
+    cursor:not-allowed;
+  }
+
+  #result{
+    margin-top: 1.4rem;
+    padding: 1rem;
+    border-radius:6px;
+    font-size:1.4rem;
+    font-weight:700;
+    text-align:center;
+    display:none;
+  }
+  #result.ok{
+    background: rgba(63,185,80,0.1);
+    border: 1px solid rgba(63,185,80,0.3);
+    color: var(--ok);
+    display:block;
+  }
+  #result.err{
+    background: rgba(248,81,73,0.1);
+    border: 1px solid rgba(248,81,73,0.3);
+    color: var(--err);
+    font-size:.85rem;
+    font-weight:400;
+    display:block;
+  }
+
+  footer{
+    position:relative;
+    border-top: 1px solid rgba(155,93,229,0.15);
+    padding: 1rem 2rem;
+    font-size:.72rem;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="logo">web<span>serv</span></div>
+    <span class="badge">CGI</span>
+    <span class="badge">.py</span>
+    <a href="/">← voltar</a>
+</header>
+
+<main>
+    <h1>Calculadora <em>CGI</em></h1>
+    <p class="subtitle">Cada operação chama /cgi/calc.py, um script Python rodado como processo CGI pelo servidor.</p>
+
+    <form id="calc-form">
+        <div class="row">
+            <input type="number" id="a" placeholder="a" step="any" required>
+            <select id="op">
+                <option value="add">+</option>
+                <option value="sub">−</option>
+                <option value="mul">×</option>
+                <option value="div">÷</option>
+            </select>
+            <input type="number" id="b" placeholder="b" step="any" required>
+        </div>
+
+        <button type="submit" class="btn" id="submit-btn">Calcular</button>
+    </form>
+
+    <div id="result"></div>
+</main>
+
+<footer>
+    GET /cgi/calc.py?a=&lt;num&gt;&amp;b=&lt;num&gt;&amp;op=add|sub|mul|div
+</footer>
+
+<script>
+    const form      = document.getElementById('calc-form');
+    const aInput    = document.getElementById('a');
+    const bInput    = document.getElementById('b');
+    const opSelect  = document.getElementById('op');
+    const submitBtn = document.getElementById('submit-btn');
+    const resultEl  = document.getElementById('result');
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        submitBtn.disabled = true;
+        resultEl.className = '';
+
+        const params = new URLSearchParams({
+            a: aInput.value,
+            b: bInput.value,
+            op: opSelect.value
+        });
+
+        fetch('/cgi/calc.py?' + params.toString())
+            .then(function(res) {
+                return res.json().then(function(data) {
+                    return { ok: res.ok, data: data };
+                });
+            })
+            .then(function(r) {
+                if (r.data.error) {
+                    resultEl.className = 'err';
+                    resultEl.textContent = r.data.error;
+                } else {
+                    resultEl.className = 'ok';
+                    resultEl.textContent = '= ' + r.data.result;
+                }
+            })
+            .catch(function(err) {
+                resultEl.className = 'err';
+                resultEl.textContent = 'falha na conexão: ' + err.message;
+            })
+            .finally(function() {
+                submitBtn.disabled = false;
+            });
+    });
+</script>
+
+</body>
+</html>

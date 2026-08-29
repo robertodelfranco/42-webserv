@@ -15,6 +15,7 @@
     --line: #1c1822;
     --ok: #3fb950;
     --err: #f85149;
+    --err-dim: #7a2323;
   }
 
   *{ margin:0; padding:0; box-sizing:border-box; }
@@ -189,6 +190,68 @@
     font-size:.72rem;
     color: var(--muted);
   }
+
+  .list-header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-top: 2.6rem;
+    margin-bottom: .4rem;
+  }
+  .list-header h2{
+    font-size:.9rem;
+    font-weight:700;
+    color: var(--text);
+  }
+  .refresh{
+    background:none;
+    border:none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size:.75rem;
+    cursor:pointer;
+    text-decoration:none;
+  }
+  .refresh:hover{ text-decoration:underline; }
+
+  .uploaded-list{
+    border-top: 1px solid var(--line);
+  }
+  .file-row{
+    display:flex;
+    align-items:center;
+    gap: .9rem;
+    padding: .7rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size:.85rem;
+  }
+  .file-row .name{
+    color: var(--text);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .file-row .del-btn{
+    margin-left:auto;
+    background:none;
+    border: 1px solid var(--err-dim);
+    color: var(--err);
+    font-family: inherit;
+    font-size:.72rem;
+    padding: .3rem .6rem;
+    border-radius:5px;
+    cursor:pointer;
+    transition: background .15s ease, color .15s ease;
+    flex-shrink:0;
+  }
+  .file-row .del-btn:hover{ background: var(--err); color: #fff; }
+  .file-row .del-btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+  .empty, .loading{
+    color: var(--muted);
+    font-size:.82rem;
+    padding: 1rem 0;
+  }
 </style>
 </head>
 <body>
@@ -196,7 +259,8 @@
 <header>
     <div class="logo">web<span>serv</span></div>
     <span class="badge">POST</span>
-    <span class="badge">multipart/form-data</span>
+    <span class="badge">DELETE</span>
+    <span class="badge">raw body</span>
     <a href="/">← voltar</a>
 </header>
 
@@ -217,19 +281,29 @@
     </form>
 
     <div id="status"></div>
+
+    <div class="list-header">
+        <h2>arquivos em /upload/</h2>
+        <button class="refresh" id="refresh-btn">↻ atualizar</button>
+    </div>
+    <div class="uploaded-list" id="uploaded-list">
+        <div class="loading">carregando lista...</div>
+    </div>
 </main>
 
 <footer>
-    POST /upload/ — os arquivos são salvos em www/uploads/
+    POST /upload/&lt;filename&gt; — os arquivos são salvos em /upload/
 </footer>
 
 <script>
-    const dropZone   = document.getElementById('drop-zone');
-    const fileInput  = document.getElementById('file-input');
-    const fileListEl = document.getElementById('file-list');
-    const submitBtn  = document.getElementById('submit-btn');
-    const statusEl   = document.getElementById('status');
-    const form       = document.getElementById('upload-form');
+    const dropZone     = document.getElementById('drop-zone');
+    const fileInput    = document.getElementById('file-input');
+    const fileListEl   = document.getElementById('file-list');
+    const submitBtn    = document.getElementById('submit-btn');
+    const statusEl     = document.getElementById('status');
+    const form         = document.getElementById('upload-form');
+    const uploadedEl   = document.getElementById('uploaded-list');
+    const refreshBtn   = document.getElementById('refresh-btn');
 
     function setFiles(fileArray) {
         fileListEl.innerHTML = '';
@@ -291,13 +365,15 @@
                 statusEl.textContent = files.length + ' arquivo(s) enviado(s) com sucesso!';
                 fileInput.value = '';
                 setFiles([]);
+                loadUploaded();
                 return;
             }
 
-            var formData = new FormData();
-            formData.append('file', files[index]);
+            var file = files[index];
 
-            fetch('/upload/', { method: 'POST', body: formData })
+            /* o servidor não faz parsing de multipart/form-data: ele espera
+            o nome do arquivo na própria URL e os bytes crus no body */
+            fetch('/upload/' + encodeURIComponent(file.name), { method: 'POST', body: file })
                 .then(function(res) {
                     if (res.ok) {
                         sendNext(index + 1);
@@ -320,6 +396,94 @@
 
         sendNext(0);
     });
+
+    function renderUploaded(names) {
+        uploadedEl.innerHTML = '';
+        if (!names.length) {
+            uploadedEl.innerHTML = '<div class="empty">nenhum arquivo em /upload/</div>';
+            return;
+        }
+
+        names.forEach(function(name) {
+            var row     = document.createElement('div');
+            row.className = 'file-row';
+
+            var nameEl  = document.createElement('span');
+            nameEl.className = 'name';
+            nameEl.textContent = name;
+
+            var delEl   = document.createElement('button');
+            delEl.className = 'del-btn';
+            delEl.type = 'button';
+            delEl.textContent = 'deletar';
+            delEl.addEventListener('click', function() {
+                deleteUploaded(name, row);
+            });
+
+            row.appendChild(nameEl);
+            row.appendChild(delEl);
+            uploadedEl.appendChild(row);
+        });
+    }
+
+    // Busca a listagem em GET /upload/ (autoindex do diretório) e extrai
+    // os nomes de arquivo a partir dos links <a href="..."> retornados.
+    function loadUploaded() {
+        uploadedEl.innerHTML = '<div class="loading">carregando lista...</div>';
+
+        fetch('/upload/', { method: 'GET' })
+            .then(function(res) {
+                if (!res.ok) throw new Error('status ' + res.status);
+                return res.text();
+            })
+            .then(function(html) {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(html, 'text/html');
+                var links = Array.from(doc.querySelectorAll('a'));
+
+                var names = links
+                    .map(function(a) { return a.getAttribute('href'); })
+                    .filter(function(href) {
+                        return href && href !== '../' && href !== '/' && href.indexOf('..') !== 0;
+                    })
+                    .map(function(href) { return decodeURIComponent(href.replace(/\/$/, '')); })
+                    // upload_path aponta pra mesma pasta desta página: sem isso,
+                    // "upload.html" apareceria na lista como se fosse um upload
+                    .filter(function(name) { return name !== 'upload.html'; });
+
+                renderUploaded(names);
+            })
+            .catch(function() {
+                uploadedEl.innerHTML = '<div class="empty">não foi possível carregar a listagem.</div>';
+            });
+    }
+
+    function deleteUploaded(name, rowEl) {
+        var delBtn = rowEl.querySelector('.del-btn');
+        if (delBtn) delBtn.disabled = true;
+
+        fetch('/upload/' + encodeURIComponent(name), { method: 'DELETE' })
+            .then(function(res) {
+                if (res.ok) {
+                    rowEl.remove();
+                    if (!uploadedEl.children.length)
+                        uploadedEl.innerHTML = '<div class="empty">nenhum arquivo em /upload/</div>';
+                } else {
+                    if (delBtn) delBtn.disabled = false;
+                    statusEl.className = 'err';
+                    statusEl.textContent = 'Erro ' + res.status + ' ao deletar "' + name + '".';
+                }
+            })
+            .catch(function(err) {
+                if (delBtn) delBtn.disabled = false;
+                statusEl.className = 'err';
+                statusEl.textContent = 'Falha na conexão ao deletar "' + name + '": ' + err.message;
+            });
+    }
+
+    refreshBtn.addEventListener('click', loadUploaded);
+
+    loadUploaded();
 </script>
 
 </body>

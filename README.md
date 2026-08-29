@@ -4,10 +4,14 @@
 
 ## Description
 
-`webserv` is a non-blocking, single-threaded HTTP/1.1 server written in C++98
-with no external dependencies. It is built around a single `poll()` call: one
-event loop drives everything — listening sockets, client sockets, and the pipes
-of CGI child processes all live in the same `pollfd` array, so no single I/O
+`webserv` is a non-blocking, single-threaded HTTP server written in C++98
+with no external dependencies. Following the subject — which suggests HTTP/1.0
+as the reference point and deliberately requires only a subset of the HTTP
+RFCs — it takes HTTP/1.0 as the baseline and layers on the HTTP/1.1 features
+that raise the bar: persistent connections (keep-alive), chunked request
+bodies, and pipelining. It is built around a single `poll()` call: one event
+loop drives everything — listening sockets, client sockets, and the pipes of
+CGI child processes all live in the same `pollfd` array, so no single I/O
 operation can ever block the whole server.
 
 The goal of the project is to reimplement, from scratch, the core of a web
@@ -25,6 +29,12 @@ Configuration uses an nginx-like syntax (`server { ... }`,
   connection, which outlives it across many `poll()` cycles. It has its own
   timeout and output cap, and the child is always reaped — no zombie is left
   behind, even if the client gives up mid-request.
+- **HTTP/1.0 and HTTP/1.1 framing**: the parser accepts both request-line
+  versions. Persistence follows the version's default (HTTP/1.0 closes after
+  the response, HTTP/1.1 stays open) and an explicit `Connection: close` /
+  `Connection: keep-alive` header overrides that default in either direction.
+  Being a deliberate subset, some 1.1-only mechanisms are out of scope
+  (mandatory `Host` rejection, `Expect: 100-continue`).
 - **Keep-alive and pipelining**: requests packed into a single packet are
   processed in sequence; a semantic error (404, 405) does not tear down the
   connection.
@@ -66,11 +76,11 @@ a hard requirement of the subject — no C++11 features are used.
 
 There is no unit-test framework; verification is manual, with `curl` and
 `telnet` against a running server. A regression suite that mirrors the defense
-checklist lives in `tests/regua.sh`:
+checklist lives in `tests/tests.sh`:
 
 ```bash
-./tests/regua.sh            # full battery (config, methods, CGI, framing, ...)
-./tests/regua.sh siege      # also runs the Siege availability/leak stress test
+./tests/tests.sh            # full battery (config, methods, CGI, framing, ...)
+./tests/tests.sh siege      # also runs the Siege availability/leak stress test
 ```
 
 Quick manual checks:
@@ -144,6 +154,9 @@ Classic references used while building the server:
 - [RFC 9110 — HTTP Semantics](https://www.rfc-editor.org/rfc/rfc9110.html)
 - [RFC 9112 — HTTP/1.1](https://www.rfc-editor.org/rfc/rfc9112.html) — message
   framing, `Content-Length` vs `Transfer-Encoding`, chunked bodies
+- [RFC 1945 — HTTP/1.0](https://www.rfc-editor.org/rfc/rfc1945.html) — the
+  baseline version suggested by the subject (default `Connection: close`, no
+  chunked request bodies)
 - [RFC 3875 — CGI/1.1](https://www.rfc-editor.org/rfc/rfc3875.html) — the CGI
   environment variables and the interpreter contract
 - [nginx documentation](https://nginx.org/en/docs/) — reference for the config
@@ -165,11 +178,12 @@ team. Concretely, AI was used to:
   `Transfer-Encoding` smuggling, chunked framing that mis-detected the
   terminator inside chunk data, a lost-request bug in HTTP pipelining, and a 431
   path that never fired.
-- **Restore body validation** (chunked well-formedness, CL/TE conflicts) that had
-  been dropped in an earlier refactor, and map each parser exception to the
-  correct HTTP status.
-- **Write the regression suite** in `tests/regua.sh`, aligned to the evaluation
+- **Write the regression suite** in `tests/tests.sh`, aligned to the evaluation
   checklist.
+- **Study other webserv implementations**: nine peer projects were mapped into
+  class diagrams (classes, relations, responsibilities), each with notes on its
+  organization and use of OOP, compiled into a single comparison flowchart —
+  used to contrast architectural choices before settling on ours.
 - **Review** the request-parsing and response code for correctness against the
   relevant RFCs.
 

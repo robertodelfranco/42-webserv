@@ -178,6 +178,24 @@
     font-size:.85rem;
   }
 
+  .file-row .thumb{
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--line);
+  }
+  .file-row .thumb.placeholder{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:.6rem;
+    letter-spacing:.03em;
+    color: var(--muted);
+    text-transform:uppercase;
+  }
+
   .file-row .name{
     color: var(--text);
     overflow:hidden;
@@ -254,7 +272,7 @@
     </div>
 
     <div class="list-header">
-        <h2>arquivos em www/uploads/</h2>
+        <h2>arquivos em /upload/</h2>
         <button class="refresh" id="refresh-btn">↻ atualizar</button>
     </div>
 
@@ -266,7 +284,7 @@
 </main>
 
 <footer>
-    DELETE /upload/&lt;filename&gt; — remove o arquivo de www/uploads/
+    DELETE /upload/&lt;filename&gt; — remove o arquivo de /upload/
 </footer>
 
 <script>
@@ -321,17 +339,49 @@
         if (e.key === 'Enter') deleteFile(input.value.trim(), null);
     });
 
+    function isImageFile(name) {
+        return /\.(png|jpe?g|gif|webp|bmp|svg|ico)$/i.test(name);
+    }
+
+    function extOf(name) {
+        var dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(dot + 1) : '?';
+    }
+
+    function makePlaceholder(name) {
+        var span = document.createElement('span');
+        span.className = 'thumb placeholder';
+        span.textContent = extOf(name);
+        return span;
+    }
+
+    function makeThumb(name) {
+        if (!isImageFile(name)) return makePlaceholder(name);
+
+        var img = document.createElement('img');
+        img.className = 'thumb';
+        img.src = '/upload/' + encodeURIComponent(name);
+        img.alt = name;
+        // se o arquivo não carregar como imagem de verdade, cai pro placeholder
+        img.addEventListener('error', function() {
+            img.replaceWith(makePlaceholder(name));
+        });
+        return img;
+    }
+
     function renderFiles(names) {
         fileListEl.innerHTML = '';
 
         if (!names.length) {
-            fileListEl.innerHTML = '<div class="empty">nenhum arquivo em www/uploads/</div>';
+            fileListEl.innerHTML = '<div class="empty">nenhum arquivo em /upload/</div>';
             return;
         }
 
         names.forEach(function(name) {
             var row = document.createElement('div');
             row.className = 'file-row';
+
+            var thumbEl = makeThumb(name);
 
             var nameEl = document.createElement('span');
             nameEl.className = 'name';
@@ -345,6 +395,7 @@
                 deleteFile(name, row);
             });
 
+            row.appendChild(thumbEl);
             row.appendChild(nameEl);
             row.appendChild(delEl);
             fileListEl.appendChild(row);
