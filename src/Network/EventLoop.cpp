@@ -7,6 +7,13 @@
 #include <unistd.h>
 #include "../Cgi/CgiProcess.hpp"
 
+volatile sig_atomic_t	EventLoop::_running = 1;
+
+void	EventLoop::requestStop(int signum) {
+	(void)signum;
+	_running = 0;
+}
+
 EventLoop::EventLoop(const std::vector<ServerConfig>& servers)
 	: _servers(servers),
 	  _listeners(),
@@ -129,7 +136,7 @@ std::vector<pollfd>	EventLoop::buildPollfds(std::vector<Connection*>& owners) {
 }
 
 void	EventLoop::run() {
-	for (;;) {
+	while (_running) {
 		std::vector<Connection*>	owners;
 		std::vector<pollfd>			pollfds = buildPollfds(owners);
 

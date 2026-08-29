@@ -15,6 +15,8 @@ static const char*	resolveConfigPath(int ac, char **av)
 int main(int ac, char **av)
 {
 	signal(SIGPIPE, SIG_IGN);
+	signal(SIGINT, EventLoop::requestStop);
+	signal(SIGTERM, EventLoop::requestStop);
 
 	Logger::setLevel(Logger::INFO); // muda pra info aqui e todos os prints de debug somem automaticamente
 	

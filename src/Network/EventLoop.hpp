@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <poll.h>
+#include <csignal>
 #include "Socket.hpp"
 #include "Connection.hpp"
 
@@ -17,6 +18,11 @@ class EventLoop {
 		std::vector<Socket*>				_listeners;	// onde ficam os sockets ouvintes
 		std::vector<const ServerConfig*>	_listenerServers; // onde ficam os Servers que correspondem a cada listener
 		std::map<int, Connection*>			_connections; // fd -> conexão ativa
+
+		// Setada só pelo handler de SIGINT/SIGTERM run() checa a cada volta
+		// pra sair do for(;;) por bem, deixando o destructor rodar de verdade
+		// (fecha listeners e conexões) em vez do processo morrer no meio do poll().
+		static volatile sig_atomic_t		_running;
 
 		EventLoop(const EventLoop& other);
 		EventLoop& operator=(const EventLoop& other);
@@ -51,6 +57,10 @@ class EventLoop {
 		~EventLoop();
 
 		void	run();
+
+		// Assinatura exigida por signal(): só marca a saída, nao mexe em
+		// mais nada (handler de sinal so pode tocar em sig_atomic_t volatile)
+		static void	requestStop(int signum);
 };
 
 #endif
