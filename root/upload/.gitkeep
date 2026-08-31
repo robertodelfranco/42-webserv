@@ -1,0 +1,2 @@
+# Mantém root/upload/ no repositório pq o git não versiona diretório vazio,
+# e os configs (42.conf, config.conf) exigem que o upload_path exista pra subir.

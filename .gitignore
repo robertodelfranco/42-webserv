@@ -1,8 +1,11 @@
 webserv
 *.o
 objs/
+valgrind.log
 .vscode/
 *.pdf
 *.md
 !README.md
+# roteiro de curls usado na defesa
+!docs/DEFESA.md
 .*/
