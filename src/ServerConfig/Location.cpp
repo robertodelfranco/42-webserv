@@ -109,6 +109,16 @@ void	Location::setCgi(const std::string& cgi_extension) {
 }
 
 void	Location::setCgiPath(const std::string& cgi_path) {
+	if (cgi_path.empty())
+		throw std::runtime_error("CGI path: path is required");
+
+	if (cgi_path[0] != '/' && cgi_path[0] != '.')
+		throw std::runtime_error("CGI path: path must start with '/' (absolute) or './' (relative) '" + cgi_path + "'");
+
+	// o interpretador precisa existir e ser executável, senão todo CGI vira 502
+	if (access(cgi_path.c_str(), X_OK) != 0)
+		throw std::runtime_error("CGI path: interpreter not found or not executable '" + cgi_path + "'");
+
 	this->cgi_path_ = cgi_path;
 }
 

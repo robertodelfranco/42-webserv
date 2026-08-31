@@ -43,3 +43,14 @@ bool	UtilsConfig::has_char(const char *str, char c) {
 bool	UtilsConfig::has_char(const std::string& str, char c) {
 	return (str.find(c) != std::string::npos);
 }
+
+bool	UtilsConfig::isAllDigits(const std::string& str) {
+	if (str.empty())
+		return false;
+
+	for (size_t i = 0; i < str.size(); ++i)
+		if (!std::isdigit(static_cast<unsigned char>(str[i])))
+			return false;
+
+	return true;
+}

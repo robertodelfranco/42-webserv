@@ -119,7 +119,7 @@ void	ConfigParser::getBodySize(ServerConfig& server, Location* location_pointer,
 
 void	ConfigParser::getRoot(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
 	++it;
-	if (it->type != PATH)
+	if (it->type != PATH && it->type != STRING)
 		throw ConfigParseError("Invalid root argument", it->line, it->col, it->value);
 
 	if (location_pointer != NULL)
@@ -158,16 +158,8 @@ void	ConfigParser::getErrorPages(ServerConfig& server, Location* location_pointe
 
 	std::vector<int> error_pages;
 
-	while (it->type == STRING) {
+	while (it->type == STRING && UtilsConfig::isAllDigits(UtilsConfig::trim(it->value))) {
 		std::string value = UtilsConfig::trim(it->value);
-
-		if (value.empty())
-			throw ConfigParseError("Empty error page value", it->line, it->col, it->value);
-
-		for (size_t i = 0; i < value.size(); ++i) {
-			if (!std::isdigit(value[i]))
-				throw ConfigParseError("Invalid error code in error page directive", it->line, it->col, it->value);
-		}
 
 		if (value.size() > 3)
 			throw ConfigParseError("Error code too long in error page directive", it->line, it->col, it->value);
@@ -181,7 +173,12 @@ void	ConfigParser::getErrorPages(ServerConfig& server, Location* location_pointe
 		++it;
 	}
 
-	if (it->type != PATH)
+	if (error_pages.empty())
+		throw ConfigParseError("Missing error code in error page directive", it->line, it->col, it->value);
+
+	// caminho de disco: PATH ("./x.html") ou STRING ("errors/x.html"),
+	// quem cobra o prefixo '/' ou './' é o setErrorPages, com mensagem propria
+	if (it->type != PATH && it->type != STRING)
 		throw ConfigParseError("Invalid error page path argument", it->line, it->col, it->value);
 
 	if (location_pointer != NULL)
@@ -236,8 +233,6 @@ void	ConfigParser::getRedirect(ServerConfig& server, Location* location_pointer,
 		throw ConfigParseError("Redirect code out of range in return directive", it->line, it->col, it->value);
 
 	++it;
-	/* PATH também vale: o lexer manda tudo que começa com '/' ou '.' pra lá,
-	e "return 301 /nova-pagina;" (redirect local) é o caso mais comum */
 	if (it->type != STRING && it->type != PATH)
 		throw ConfigParseError("Invalid redirect URL argument", it->line, it->col, it->value);
 
@@ -271,7 +266,8 @@ void	ConfigParser::getCgi(ServerConfig& server, Location* location_pointer, std:
 void	ConfigParser::getCgiPath(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
 	(void)server; // cgi_path é location-only, contexto já garante location_pointer != NULL
 	++it;
-	if (it->type != PATH)
+	// caminho do interpretador é caminho de disco, aceita relativo puro
+	if (it->type != PATH && it->type != STRING)
 		throw ConfigParseError("Invalid CGI path argument", it->line, it->col, it->value);
 
 	std::string cgi_path = UtilsConfig::trim(it->value);
@@ -301,7 +297,8 @@ void	ConfigParser::getAutoindex(ServerConfig& server, Location* location_pointer
 void	ConfigParser::getUploadPath(ServerConfig& server, Location* location_pointer, std::vector<Token>::iterator& it) {
 	(void)server; // upload_path é location-only, contexto já garante location_pointer != NULL
 	++it;
-	if (it->type != PATH)
+	// idem: diretório de upload é caminho de disco, aceita relativo puro
+	if (it->type != PATH && it->type != STRING)
 		throw ConfigParseError("Invalid upload path argument", it->line, it->col, it->value);
 
 	std::string path = UtilsConfig::trim(it->value);
