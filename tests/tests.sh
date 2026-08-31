@@ -235,11 +235,17 @@ if [ "$MODE" = "local" ]; then
 		sleep 1
 		if kill -0 "$cpid" 2>/dev/null; then
 			ok "$name sobe"
-			kill "$cpid" 2>/dev/null; wait "$cpid" 2>/dev/null
 		else
 			bad "$name NAO sobe: $(grep -i 'error' "$FIX/cfg.log" | head -1 | sed 's/\x1b\[[0-9;]*m//g')"
 		fi
-		sleep 0.3
+		# Vários configs compartilham porta (42.conf e config.conf usam 8080).
+		# Esperar o processo morrer de verdade, e não um sleep fixo: com sleep
+		# o próximo config tentava bindar antes de a porta ser liberada, e o
+		# teste falhava de forma intermitente — que é pior que não testar.
+		kill "$cpid" 2>/dev/null
+		wait "$cpid" 2>/dev/null
+		i=0
+		while kill -0 "$cpid" 2>/dev/null && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done
 	done
 
 	make_fixtures "$FIX" "$ROOT/root/www/cgi-bin"
@@ -260,6 +266,33 @@ else
 	else bad "nao alcancei $HOST:$PORT_A"; exit 1; fi
 	wait_port "$PORT_B" && ok "servidor remoto respondendo em $HOST:$PORT_B" \
 	                   || skip "site B em $HOST:$PORT_B" "porta nao responde"
+fi
+
+# --------------------------------------------------------------------------
+#  Confere que o alvo roda A CONFIG DESTE SCRIPT antes de testar qualquer coisa.
+#
+#  A bateria não é agnóstica de config: ela espera as rotas /listagem, /old,
+#  /upload e /cgi, mais a página de índice e o 404 customizado. Apontar o
+#  script pra um servidor rodando outra config (default.conf, 42.conf, ...)
+#  produz uma dúzia de falhas que parecem bug do servidor e não são.
+#  Por isso: uma mensagem clara aqui, em vez de 12 confusas lá embaixo.
+# --------------------------------------------------------------------------
+if ! curl -s --max-time 10 "http://$HOST:$PORT_A/" | grep -q "SITE A index"; then
+	printf '\n\033[31m  O servidor em %s:%s NAO esta rodando a config deste script.\033[0m\n' "$HOST" "$PORT_A"
+	cat <<EOF
+
+  A bateria espera as rotas /listagem, /old, /upload e /cgi. Gere a config e
+  suba o servidor com ELA:
+
+      ./tests/tests.sh --emit /tmp/demo --port $PORT_A --port-b $PORT_B
+      ./webserv /tmp/demo/test.conf
+
+  E entao rode:
+
+      ./tests/tests.sh --host $HOST --port $PORT_A --port-b $PORT_B
+
+EOF
+	exit 2
 fi
 
 # --------------------------------------------------------------------------
@@ -313,6 +346,21 @@ raw_status "CL + TE juntos (smuggling) -> 400" "$PORT_A" "${H}Content-Length: 5\
 raw_status "TE nao-chunked -> 501"             "$PORT_A" "${H}Transfer-Encoding: gzip\r\n\r\n" "501"
 raw_status "chunked malformado -> 400"         "$PORT_A" "${H}Transfer-Encoding: chunked\r\n\r\n5\r\nhello\r\nZZZ\r\nx\r\n0\r\n\r\n" "400"
 raw_status "Content-Length com lixo -> 400"    "$PORT_A" "${H}Content-Length: 5abc\r\n\r\nhello" "400"
+
+# O dado do chunk contem literalmente os bytes do terminador ("\r\n0\r\n\r\n").
+# Quem procura o fim com find() casa aqui dentro e corta a request no meio:
+# o status continua 200, só o BODY vem truncado — por isso o teste olha o
+# corpo ecoado, e não o status.
+chunk_data='AB\r\n0\r\n\r\nCDE'      # 12 bytes
+body=$(python3 -c "$PYRAW"'
+i = d.find(b"\r\n\r\n")
+print(d[i+4:].decode("latin-1") if i >= 0 else "")
+' "$HOST" "$PORT_A" "${H}Transfer-Encoding: chunked\r\n\r\nc\r\n${chunk_data}\r\n0\r\n\r\n")
+if echo "$body" | grep -q "len=12"; then
+	ok "terminador dentro do dado do chunk (body integro)"
+else
+	bad "terminador dentro do dado cortou a request (esperava len=12, veio '$(echo "$body" | head -1)')"
+fi
 raw_status "Content-Length negativo -> 400"    "$PORT_A" "${H}Content-Length: -1\r\n\r\n" "400"
 
 # --------------------------------------------------------------------------

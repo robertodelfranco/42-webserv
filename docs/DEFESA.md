@@ -26,11 +26,22 @@ B=http://localhost:8091
 ### O atalho: rodar tudo de uma vez
 
 ```bash
-./tests/tests.sh              # 61 checagens
+./tests/tests.sh              # 66 checagens
 ./tests/tests.sh siege        # + stress test
 ./tests/tests.sh valgrind     # + relatório de leak
 ./tests/tests.sh --host <ip>  # contra o servidor na nuvem
 ```
+
+> **A bateria não é agnóstica de config.** Ela espera as rotas `/listagem`,
+> `/old`, `/upload` e `/cgi` — as da config que ela mesma gera. Apontar o script
+> para um servidor rodando `default.conf` ou `42.conf` falha em tudo que é rota.
+> Em outra porta, gere a config com a porta certa:
+>
+> ```bash
+> ./tests/tests.sh --emit /tmp/demo --port 8080 --port-b 8081
+> ./webserv /tmp/demo/test.conf
+> ./tests/tests.sh --host localhost --port 8080 --port-b 8081
+> ```
 
 Ofereça isso ao avaliador **depois** de mostrar os curls à mão — primeiro ele
 quer ver você operando o servidor, não um script.
