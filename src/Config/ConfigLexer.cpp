@@ -193,6 +193,7 @@ void	ConfigLexer::consumeLine(std::string& line, size_t count_line) {
 		return ;
 
 	size_t	col = 0;
+	bool	expectDirective = true;
 	while (col < line.size()) {
 		unsigned char c = static_cast<unsigned char>(line[col]);
 
@@ -200,16 +201,20 @@ void	ConfigLexer::consumeLine(std::string& line, size_t count_line) {
 			++col;
 			continue ;
 		}
-		if (col == 0 && (std::isalpha(c) || c == '_'))
+		if (expectDirective && (std::isalpha(c) || c == '_')) {
 			col = consumeDirective(line, count_line, col);
+			expectDirective = false;
+		}
 		else if (std::isalpha(c) || c == '_' || std::isdigit(c))
 			col = consumeName(line, count_line, col);
 		else if (c == '\"' || c == '\'')
 			col = consumeString(line, count_line, col);
 		else if (c == '/' || c == '.')
 			col = consumePath(line, count_line, col);
-		else if (c == '{' || c == '}' || c == ';')
+		else if (c == '{' || c == '}' || c == ';') {
 			col = consumeSymbol(line, count_line, col);
+			expectDirective = true;
+		}
 		else
 			col = edgeCase(line, count_line, col);
 	}
