@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netdb.h>     // getaddrinfo/freeaddrinfo, no lugar do inet_pton
 #include "../Utils/Logger.hpp"
 
 // Função para construir o socket e configurá-lo.
@@ -47,8 +48,21 @@ void	Socket::bind(const std::string& host, unsigned short port) {
 
 	if (host.empty() || host == "0.0.0.0")
 		addr.sin_addr.s_addr = INADDR_ANY;
-	else if (inet_pton(AF_INET, host.c_str(), &addr.sin_addr) != 1)
-		throw std::runtime_error("Socket: invalid host '" + host + "'");
+	else {
+		struct addrinfo		hints;
+		struct addrinfo*	res = NULL;
+
+		std::memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_NUMERICHOST;
+
+		if (getaddrinfo(host.c_str(), NULL, &hints, &res) != 0 || res == NULL)
+			throw std::runtime_error("Socket: invalid host '" + host + "'");
+
+		addr.sin_addr = reinterpret_cast<struct sockaddr_in*>(res->ai_addr)->sin_addr;
+		freeaddrinfo(res);
+	}
 
 	if (::bind(_fd.get(), reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
 		std::ostringstream oss;

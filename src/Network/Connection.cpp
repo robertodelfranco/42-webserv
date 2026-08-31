@@ -2,7 +2,6 @@
 #include "Socket.hpp"
 #include "Router.hpp"
 #include <iostream>
-#include <cerrno>
 #include <cstdlib>
 #include <sstream>
 #include <poll.h>
