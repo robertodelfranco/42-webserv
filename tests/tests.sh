@@ -28,7 +28,10 @@ cd "$(dirname "$0")/.." || exit 1
 ROOT="$(pwd)"
 BIN="$ROOT/webserv"
 
-HOST="localhost"
+# 127.0.0.1 e não "localhost": em máquina cujo /etc/hosts só mapeia localhost
+# para ::1 (IPv6), o servidor — que faz bind AF_INET — fica inalcançável pelo
+# nome, e os testes falhavam com "servidor nao subiu" mesmo ele estando no ar.
+HOST="127.0.0.1"
 PORT_A=8090
 PORT_B=8091
 MODE="local"          # local | remote | emit
@@ -132,6 +135,16 @@ wait_port() {
 #  Fixtures: páginas + config
 #  (error_page é RELATIVO ao root, senão o joinPath concatena errado)
 # --------------------------------------------------------------------------
+# O bônus de "multiple CGI systems" só pode ser testado onde o php-cgi existe.
+# Precisa ser condicional: a validação do cgi_path recusa um interpretador
+# inexistente no boot, então incluir a location sem o binário derrubaria a
+# config inteira em vez de pular um teste.
+# Detecta sozinho, mas o ambiente vence: "PHP_CGI= ./tests/tests.sh" força o
+# skip (útil para checar que a suíte roda numa máquina sem PHP).
+if [ -z "${PHP_CGI+definido}" ]; then
+	PHP_CGI="$(command -v php-cgi 2>/dev/null || true)"
+fi
+
 make_fixtures() {
 	local base="$1" cgibin="$2"
 	mkdir -p "$base/site_a/errors" "$base/site_b" "$base/listagem" "$base/uploads"
@@ -177,6 +190,12 @@ server {
         cgi_type .py;
         cgi_path /usr/bin/python3;
     }
+$([ -n "$PHP_CGI" ] && printf '%s\n' "    location /cgi-php {
+        root $cgibin;
+        methods GET POST;
+        cgi_type .php;
+        cgi_path $PHP_CGI;
+    }")
 }
 
 # Site B — prova de multi-porta / multi-site
@@ -199,6 +218,7 @@ if [ "$MODE" = "emit" ]; then
 	make_fixtures "$EMIT_DIR" "$EMIT_DIR/cgi-bin"
 	mkdir -p "$EMIT_DIR/cgi-bin"
 	cp "$ROOT"/root/www/cgi-bin/*.py "$EMIT_DIR/cgi-bin/" 2>/dev/null
+	cp "$ROOT"/root/www/cgi-bin/*.php "$EMIT_DIR/cgi-bin/" 2>/dev/null
 	echo "Fixtures geradas em: $EMIT_DIR"
 	echo
 	echo "  1) rsync -a '$EMIT_DIR/' user@host:'$EMIT_DIR/'"
@@ -397,6 +417,18 @@ if [ "$code" = "504" ] && [ $((t1-t0)) -lt 55 ]; then
 	ok "CGI loop infinito -> 504 em $((t1-t0))s (nao pendura)"
 else bad "CGI timeout falhou (code=$code em $((t1-t0))s)"; fi
 check_status "servidor vivo depois do CGI ruim" "$PORT_A" / 200
+
+# Bônus da régua: dois interpretadores diferentes na MESMA config.
+if [ -n "$PHP_CGI" ]; then
+	check_status "CGI .php GET"           "$PORT_A" "/cgi-php/info.php?nome=teste" 200
+	check_body   "CGI .php le a query"    "$PORT_A" "/cgi-php/info.php?nome=teste" "query       : nome=teste"
+	check_body   "CGI .php le o body"     "$PORT_A" /cgi-php/info.php "body        : mensagem=oi" -d 'mensagem=oi'
+	check_body   "CGI .php roda no dir certo" "$PORT_A" /cgi-php/info.php "cwd         : cgi-bin"
+	# o ponto do bônus: .py e .php respondendo no mesmo servidor, mesma config
+	check_status ".py ainda responde (2 CGIs juntos)" "$PORT_A" /cgi/hello.py 200
+else
+	skip "CGI .php (bonus: multiple CGI systems)" "php-cgi nao instalado"
+fi
 
 # --------------------------------------------------------------------------
 say "Multi-porta / multi-site (régua: port issues)"
